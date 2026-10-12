@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a2a">
+  <meta name="description" content="口袋密室：時間測試。以原版卡牌進行的本機解謎遊戲。">
+  <title>口袋密室 · 時間測試</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="js/cards.js"></script>
+  <script defer src="js/puzzles.js"></script>
+  <script defer src="js/game.js"></script>
+  <script defer src="js/ui.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#" id="home-link" aria-label="回到首頁"><span class="brand-mark">◈</span><span>口袋密室<small>DECKSCAPE · TEST TIME</small></span></a>
+    <nav aria-label="主選單"><button class="text-button" id="rules-button">遊玩規則 <span>↗</span></button><span class="local-badge"><i></i> 本機遊玩</span></nav>
+  </header>
+  <main id="app"></main>
+  <footer><span>一場關於觀察、選擇與時間的實驗。</span><span>私人數位卡牌原型 · 原版圖像</span></footer>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button class="icon-button" id="modal-close" aria-label="關閉視窗">×</button></div><div id="modal-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript>這個遊戲需要開啟瀏覽器的 JavaScript。</noscript>
+</body>
+</html>
