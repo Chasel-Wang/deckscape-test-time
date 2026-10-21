@@ -31,8 +31,8 @@
   }
   function clearRulesReview() { rulesReview?.observer?.disconnect(); rulesReview=null; }
   function closeModal() { clearRulesReview(); modal.close(); }
-  function rules(forceReview=false) {
-    const required=!rulesAcknowledged&&(forceReview||onHome||!state);
+  function rules(forStart=false) {
+    const required=forStart;
     const automaticCount=Object.values(P.puzzles).filter(p=>p.answers).length;
     const manualCount=Object.keys(P.puzzles).length-automaticCount;
     showModal('進入實驗室之前', `${required?'<p class="rules-intro">開始前，請先閱讀完整遊玩規則，再確認已閱讀。</p>':''}<div id="rules-reader" class="rules-reader" tabindex="0" role="region" aria-label="完整遊玩規則"><p class="eyebrow">HOW TO PLAY</p><ol class="rule-list">${D.rulesText.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
@@ -55,9 +55,9 @@
     app.innerHTML = `${dev ? '<div class="developer-bar">開發測試模式 · 所有卡牌檢視可能包含劇透 <button data-action="catalog">素材清單</button></div>' : ''}
       <section class="home"><div class="hero"><div><p class="eyebrow">THE EXPERIMENT BEGINS</p><h1>口袋密室<span>時間測試</span></h1>
         <p class="hero-description">一間封閉的實驗室，一位神祕的博士。<br>線索藏在卡牌之間，出口等待你的發現。<br>準備好，接受這場關於時間的測試。</p>
-        <div class="hero-actions">${state ? button(state.phase === 'ending' ? '查看遊戲結算 <span>↗</span>' : '繼續探索 <span>→</span>', 'continue') + button('開始新遊戲', 'new', true,`${rulesAcknowledged?'':'disabled'} aria-describedby="rules-status"`) : button('進入實驗室 <span>→</span>', 'new',false,`${rulesAcknowledged?'':'disabled'} aria-describedby="rules-status"`)}
+        <div class="hero-actions">${state ? button(state.phase === 'ending' ? '查看遊戲結算 <span>↗</span>' : '繼續探索 <span>→</span>', 'continue') + button('開始新遊戲', 'new', true) : button('進入實驗室 <span>→</span>', 'new')}
         <button class="text-button" data-action="rules">閱讀遊玩規則 ↗</button></div>
-        <p class="rules-home-status" id="rules-status" role="status">${rulesAcknowledged?'已確認遊玩規則，可以開始新遊戲。':'開始新遊戲前，請先閱讀並確認遊玩規則。'}</p>
+        <p class="rules-home-status">開始新遊戲會先顯示遊玩規則，確認後才進入。</p>
         <p class="hero-fineprint">${state ? `已保存進度 · ${progress.answered} 題作答 · ${state.phase === 'intro' ? '開場尚未計時' : '經過 ' + time(progress.elapsed)}` : '無需安裝 · 自動存檔 · 隨時繼續'}</p></div>
         <div class="art" aria-hidden="true"><span class="art-label">CASE FILE / 001</span><div class="art-circle"></div><div class="cover-card back-one"></div><div class="cover-card back-two"></div><div class="cover-card main"><div class="tiny">DECKSCAPE · TEST TIME</div><div class="clock-face"></div><div class="cover-name">口袋密室</div><div class="cover-sub">時間測試</div></div><span class="art-bottom">OBSERVE. CONNECT. ESCAPE.</span></div></div>
         <div class="home-meta"><span><strong>單人或同桌協作</strong>一起觀察，共同解謎</span><span><strong>4 組探索牌堆</strong>自由切換，串聯線索</span><span><strong>你的時間，正在流動</strong>依原版規則計時與結算</span></div>
@@ -66,13 +66,16 @@
         ${loadIssue ? `<div class="notice warning">${esc(loadIssue)}</div>` : ''}${saveIssue ? `<div class="notice warning">${esc(saveIssue)}</div>` : ''}</section>`;
   }
   function start() {
-    if(!rulesAcknowledged){rules(true);return;}
+    rulesAcknowledged=false;rules(true);
+  }
+  function finishStart() {
+    if(!rulesAcknowledged){start();return;}
     if (state || loadIssue) {
       showModal('重新開始這場測試？', '<p>目前的遊戲進度、筆記與作答紀錄將被新的遊戲覆寫。</p><div class="modal-actions">' + button('保留目前進度', 'close', true) + button('確認重新開始', 'reset-confirm') + '</div>');
     } else begin();
   }
   function begin() {
-    if(!rulesAcknowledged){rules(true);return;}
+    if(!rulesAcknowledged){start();return;}
     state=E.fresh();onHome=false;loadIssue='';rulesAcknowledged=false;closeModal();persist();render();
   }
   function render() {
@@ -278,7 +281,7 @@
   function act(action,target) {
     switch(action) {
       case 'rules':rules();break;
-      case 'rules-accept':if(modal.open&&rulesReview?.complete){rulesAcknowledged=true;closeModal();render();}break;
+      case 'rules-accept':if(modal.open&&rulesReview?.complete){rulesAcknowledged=true;closeModal();finishStart();}break;
       case 'new':start();break;
       case 'reset-confirm':begin();break;
       case 'continue':onHome=false;render();break;
