@@ -2,6 +2,7 @@
   'use strict';
   const D = window.DeckData, P = window.PuzzleData;
   const SAVE_KEY = 'deckscape-test-time-v1';
+  const ITEM_LOCK_MESSAGE = '請先取得相應道具，再回來解開這道謎題。';
   const deckIds = Object.keys(D.decks);
   const clone = object => JSON.parse(JSON.stringify(object));
   function fresh(now = Date.now()) {
@@ -36,7 +37,7 @@
     if (state.phase === 'ending') throw new Error('遊戲已結束。');
     const c = current(state);
     if (!c) throw new Error('這組牌堆已探索完畢。');
-    if (!canReveal(state,c.id)) throw new Error('請先取得關鍵物品，再公開這張卡牌。');
+    if (!canReveal(state,c.id)) throw new Error(ITEM_LOCK_MESSAGE);
     if (c.cardType === 'puzzle' && (!state.answers[c.id] || state.answers[c.id].status === 'pending')) throw new Error('請先完成作答與核對。');
     if (c.cardType === 'choice') throw new Error('請先選擇要留下的物品。');
     if (c.itemId && !state.inventory.includes(c.itemId)) state.inventory.push(c.itemId);
@@ -52,13 +53,14 @@
     const c = current(state);
     if (!c || c.cardType !== 'puzzle' || state.answers[c.id]) throw new Error('這題無法再次作答。');
     const blockers=answerBlockers(state,c.id);
-    if(blockers.length)throw new Error(`請先取得${blockers.map(id=>D.items[id].name).join('、')}，才能作答。`);
+    if(blockers.length)throw new Error(ITEM_LOCK_MESSAGE);
     if (!String(answer).trim()) throw new Error('請先填寫你的答案。');
     const p = P.puzzles[c.id], missing = p.required.filter(id => !state.inventory.includes(id));
-    if(p.inputType==='inventory'&&!state.inventory.includes(String(answer).trim()))throw new Error('只能選擇當下已取得的物品。');
+    if(p.inputType==='inventory'&&!state.inventory.includes(String(answer).trim()))throw new Error(ITEM_LOCK_MESSAGE);
     if(p.inputType==='item-orientation'){
       const selection=/^([a-z0-9-]+):(0|90|180|270)$/.exec(String(answer).trim());
-      if(!selection||!state.inventory.includes(selection[1]))throw new Error('請從已取得的物品選擇卡片和方向。');
+      if(!selection)throw new Error('請從已取得的物品選擇卡片和方向。');
+      if(!state.inventory.includes(selection[1]))throw new Error(ITEM_LOCK_MESSAGE);
     }
     const correct = P.check(c.id, answer);
     state.answers[c.id] = { answer: String(answer).trim().slice(0, 1200), at: now, correct,
@@ -77,13 +79,13 @@
   function hint(state) {
     const c = current(state);
     const number = c?.cardType === 'choice' ? 55 : c?.number;
-    if(c&&!canReveal(state,c.id))throw new Error('這張卡尚未公開。');
+    if(c&&!canReveal(state,c.id))throw new Error(ITEM_LOCK_MESSAGE);
     if (!c || !['puzzle','choice'].includes(c.cardType) || !D.hintColumns.some(col => col.includes(number))) throw new Error('這張卡沒有提供原版提示。');
     const id = c.cardType === 'choice' ? 'ending-choice' : c.id;
     if (!state.hints.includes(id)) state.hints.push(id);
   }
   function itemCard(state, id) {
-    if (!state.inventory.includes(id)) throw new Error('尚未取得這個物品。');
+    if (!state.inventory.includes(id)) throw new Error(ITEM_LOCK_MESSAGE);
     const item = D.items[id];
     return D.cards[id === 'flashlight' && !state.inventory.includes('batteries') ? item.unlitCardId : item.cardId];
   }
@@ -96,7 +98,7 @@
   }
   function finish(state, itemId, now = Date.now()) {
     if (state.phase !== 'playing' || current(state)?.cardType !== 'choice') throw new Error('還沒到最後的選擇。');
-    if (!state.inventory.includes(itemId)) throw new Error('只能選擇已取得的物品。');
+    if (!state.inventory.includes(itemId)) throw new Error(ITEM_LOCK_MESSAGE);
     const ending = Object.values(D.endings).find(e => e.items.includes(itemId));
     if (!ending) throw new Error('物品沒有對應的結局。');
     state.leftItem = itemId; state.ending = ending.id; state.finishedAt = now; state.phase = 'ending';
@@ -147,5 +149,5 @@
     });
     return parsed;
   }
-  window.GameEngine = { SAVE_KEY, fresh, current, revealBlockers, canReveal, answerBlockers, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
+  window.GameEngine = { SAVE_KEY, ITEM_LOCK_MESSAGE, fresh, current, revealBlockers, canReveal, answerBlockers, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
 })();

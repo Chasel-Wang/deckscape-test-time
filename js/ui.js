@@ -101,10 +101,22 @@
     return selection&&D.items[selection[1]]?`${D.items[selection[1]].name} · ${selection[2]==='0'?'原方向':`旋轉 ${selection[2]} 度`}`:answer;
   }
   function answerFields(p) {
+    if(p.inputType==='sequence-buttons')return `<input class="answer-field sequence-answer" id="answer" name="answer" readonly maxlength="1200" aria-label="已選字母順序" placeholder="依序點選下方字母"><div class="sequence-keypad" role="group" aria-label="選擇字母 A 至 N">${p.letters.map(letter=>`<button type="button" data-action="sequence-add" data-letter="${letter}" aria-label="加入 ${letter}">${letter}</button>`).join('')}</div><div class="sequence-actions"><button type="button" id="sequence-undo" data-action="sequence-undo" disabled>刪除最後一個</button><button type="button" id="sequence-clear" data-action="sequence-clear" disabled>清空重選</button></div>`;
+    if(p.inputType==='coordinate-select')return `<div class="coordinate-fields"><label for="answer-column">橫排（${p.coordinateOptions.columns[0]}–${p.coordinateOptions.columns.at(-1)}）<select id="answer-column" name="coordinateColumn" required><option value="" disabled selected>選擇字母</option>${p.coordinateOptions.columns.map(value=>`<option value="${value}">${value}</option>`).join('')}</select></label><label for="answer-row">直排（${p.coordinateOptions.rows[0]}–${p.coordinateOptions.rows.at(-1)}）<select id="answer-row" name="coordinateRow" required><option value="" disabled selected>選擇數字</option>${p.coordinateOptions.rows.map(value=>`<option value="${value}">${value}</option>`).join('')}</select></label></div>`;
     if(p.inputType==='inventory')return `<select class="answer-field" id="answer" name="answer" required>${itemOptions()}</select>`;
-    if(p.inputType==='item-orientation')return `<select class="answer-field" id="answer-item" name="selectedItem" required aria-label="選擇物品卡">${itemOptions()}</select><div id="orientation-options" class="orientation-options" role="radiogroup" aria-label="選擇卡片方向"><p class="muted">選擇物品後，會顯示該卡片的四種方向。</p></div>`;
+    if(p.inputType==='item-orientation')return `<select class="answer-field" id="answer-item" name="selectedItem" required aria-label="選擇物品卡">${itemOptions()}</select><div id="orientation-options" class="orientation-options" role="radiogroup" aria-label="選擇卡片方向"></div>`;
     if(p.choices)return `<fieldset class="answer-options" aria-label="選擇答案">${p.choices.map((option,i)=>`<label><input ${i===0?'id="answer"':''} type="radio" name="answer" value="${esc(option.value)}" required>${esc(option.label)}</label>`).join('')}</fieldset>`;
     return '<input class="answer-field" id="answer" name="answer" autocomplete="off" maxlength="1200" placeholder="先思考，再送出你的答案" required>';
+  }
+  function updateSequence(action,letter) {
+    const c=E.current(state),p=c&&P.puzzles[c.id],field=document.getElementById('answer');
+    if(p?.inputType!=='sequence-buttons'||!field||state.answers[c.id])return;
+    if(action==='sequence-add'&&p.letters.includes(letter)&&field.value.length<field.maxLength)field.value+=letter;
+    if(action==='sequence-undo')field.value=field.value.slice(0,-1);
+    if(action==='sequence-clear')field.value='';
+    document.getElementById('sequence-undo').disabled=!field.value;
+    document.getElementById('sequence-clear').disabled=!field.value;
+    field.scrollLeft=field.scrollWidth;
   }
   function updateOrientationOptions() {
     const picker=document.getElementById('answer-item'),container=document.getElementById('orientation-options');
@@ -113,12 +125,12 @@
     container.innerHTML=[0,90,180,270].map(angle=>`<label class="orientation-choice"><input type="radio" name="rotation" value="${angle}" required><span class="orientation-preview"><img src="${asset(card.frontImage)}" alt="${esc(D.items[picker.value].name)}，${angle===0?'原方向':`旋轉 ${angle} 度`}" style="transform:rotate(${angle}deg)" draggable="false"></span><span>${angle===0?'原方向':`旋轉 ${angle} 度`}</span></label>`).join('');
   }
   function interaction(c) {
-    if(!E.canReveal(state,c.id))return `<section class="interaction"><h2>等待公開</h2><p>先取得${E.revealBlockers(state,c.id).map(id=>`「${esc(D.items[id].name)}」`).join('、')}，再回來查看這張卡牌。</p></section>`;
+    if(!E.canReveal(state,c.id))return `<section class="interaction"><h2>等待公開</h2><p>${E.ITEM_LOCK_MESSAGE}</p></section>`;
     if (c.cardType === 'puzzle') {
       const p = P.puzzles[c.id], record = state.answers[c.id];
       const blockers=E.answerBlockers(state,c.id);
-      if(!record&&blockers.length)return `<section class="interaction"><h2>尚未解鎖作答</h2><p>請先取得${blockers.map(id=>`「${esc(D.items[id].name)}」`).join('、')}，再回來解開這道謎題。</p></section>`;
-      if (!record) return `<section class="interaction"><form id="answer-form"><h2>你的解答</h2>${p.prompt?`<label class="input-label" for="${p.inputType==='item-orientation'?'answer-item':'answer'}">${esc(p.prompt)}</label>`:''}${answerFields(p)}<div class="answer-row"><button class="button" type="submit">確認作答 <span>→</span></button><small>每題只可送出一次</small></div></form></section>`;
+      if(!record&&blockers.length)return `<section class="interaction"><h2>尚未解鎖作答</h2><p>${E.ITEM_LOCK_MESSAGE}</p></section>`;
+      if (!record) return `<section class="interaction"><form id="answer-form"><h2>你的解答</h2>${p.prompt?`<label class="input-label" for="${p.inputType==='item-orientation'?'answer-item':p.inputType==='coordinate-select'?'answer-column':'answer'}">${esc(p.prompt)}</label>`:''}${answerFields(p)}<div class="answer-row"><button class="button" type="submit">確認作答 <span>→</span></button><small>每題只可送出一次</small></div></form></section>`;
       if (record.status === 'pending') return `<section class="interaction"><span class="result-tag pending">答案已鎖定 · 等待核對</span><div class="recorded-answer">${esc(record.answer)}</div><p>本題的原版解答背面尚未提供。請對照實體解答，再記錄結果；若沒有解答，請保留為「待核對」。</p><label class="check-label"><input type="checkbox" id="missing-item">核對後確認：作答時缺少必需物品（記錄 2 個 X）</label><div class="manual-actions">${button('已核對，正確', 'adjudicate', false, 'data-verdict="correct"')}${button('已核對，錯誤', 'adjudicate', true, 'data-verdict="incorrect"')}${button('保留待核對，繼續', 'adjudicate', true, 'data-verdict="unverified"')}</div>${record.missing.length ? '<p>依卡牌已確認缺少必需物品，本題記錄 2 個 X。</p>' : ''}</section>`;
       const label = record.status==='unverified' ? '待核對 · 成績暫定' : record.correct ? '已核對 · 解答正確' : '已核對 · 解答有誤';
       return `<section class="interaction"><span class="result-tag ${record.status==='unverified'?'pending':!record.correct?'wrong':''}">${label}</span><div class="recorded-answer">${esc(answerLabel(c.id,record.answer))}</div>${p.explanation ? `<p>${esc(p.explanation)}</p>` : ''}${record.penalty ? `<p>本題記錄 ${record.penalty} 個 X${record.penalty===2?'（缺少必需物品）':''}。仍依卡牌指示繼續。</p>` : ''}<div class="answer-row">${button('依指示繼續 <span>→</span>', 'advance')}${c.backImage ? button('查看解答背面', 'solution', true) : ''}</div></section>`;
@@ -126,14 +138,14 @@
     if (c.cardType === 'choice') return `<section class="interaction"><h2>你想留下什麼？</h2><p>選擇一件隨身物品，留給過去的博士。確認後即決定這場測試的結局。</p><form id="ending-form"><div class="ending-choice">${state.inventory.map(id=>`<label><input type="radio" name="leftItem" value="${id}" required> ${esc(D.items[id].name)}</label>`).join('')}</div><button type="submit" class="button">做出最後的選擇 <span>→</span></button></form></section>`;
     let label = c.cardType==='item' ? '收好物品，繼續' : '依指示繼續';
     if (c.id === 'curtain-b') label = '揭開四道帷幕，開始計時';
-    return `<section class="interaction"><h2>${esc(c.title)}</h2>${c.id==='blue-003'&&!state.inventory.includes('batteries')?'<p>已收好手電筒。取得電池後，才可查看它的另一面。</p>':''}${button(label + ' <span>→</span>', 'advance')}</section>`;
+    return `<section class="interaction"><h2>${esc(c.title)}</h2>${c.id==='blue-003'&&!state.inventory.includes('batteries')?`<p>${E.ITEM_LOCK_MESSAGE}</p>`:''}${button(label + ' <span>→</span>', 'advance')}</section>`;
   }
   function summary() {
     const s = E.stats(state), ending = D.endings[state.ending], c = D.cards[ending.cardId];
     app.innerHTML = `<section class="summary"><p class="eyebrow">EXPERIMENT COMPLETE</p><h1>測試結束，時間揭曉。</h1><p class="muted">你留下了「${esc(D.items[state.leftItem].name)}」，抵達結局 ${state.ending}。</p><div class="summary-layout"><div><span class="result-tag ${s.unresolved?'pending':''}">${s.unresolved?`暫定成績 · ${s.unresolved} 題尚待核對`:'遊戲結算'}</span><div class="summary-stats"><div><span>實際探索時間</span><strong>${time(s.elapsed)}</strong></div><div><span>原始錯誤 X</span><strong>${s.errors}</strong></div><div><span>結局抵銷 X</span><strong>− ${Math.min(s.errors,s.discount)}</strong></div><div><span>錯誤加時</span><strong>+ ${s.remaining*5} 分</strong></div></div><h2>最終計分時間</h2><div class="summary-rating">${time(s.total)}<br>${s.unresolved?'暫定評價：':''}${s.rating}</div><p class="help-note">${s.hints} 題查看提示 · ${s.answered} 題已作答<br>評級按原版分鐘欄位計算，秒數捨去。</p>${s.unresolved?'<div class="notice warning">尚未核對的作答沒有被當成答對。這是暫定下限，補上核對結果後，錯誤加時和評級可能改變。</div>':''}<div class="summary-actions">${button('查看作答紀錄','log')}${button('匯出紀錄','export',true)}${button('回到首頁','home',true)}</div></div><img class="summary-card" src="${asset(c.frontImage)}" alt="結局 ${state.ending}" data-action="view" data-card="${c.id}" tabindex="0" role="button"></div><div class="summary-actions">${button('查看遊戲結束卡','view',true,`data-card="${D.finalCard}"`)}${button('開始新遊戲','new',true)}</div></section>`;
   }
   function view(id) {
-    if (!state || !E.canView(state,id)) throw new Error('這張卡牌尚未解鎖。');
+    if (!state || !E.canView(state,id)) throw new Error(state&&E.revealBlockers(state,id).length?E.ITEM_LOCK_MESSAGE:'這張卡牌尚未解鎖。');
     viewer(D.cards[id]);
   }
   function viewer(c) {
@@ -217,7 +229,7 @@
   }
   function loadCompareCard(key) {
     const id=document.getElementById(`compare-${key}`).value;
-    if(!E.canView(state,id)&&!state.inventory.some(item=>E.itemCard(state,item).id===id))throw new Error('無法查看未解鎖物品。');
+    if(!E.canView(state,id)&&!state.inventory.some(item=>E.itemCard(state,item).id===id))throw new Error(E.revealBlockers(state,id).length?E.ITEM_LOCK_MESSAGE:'無法查看未解鎖物品。');
     const card=D.cards[id];document.getElementById(`compare-image-${key}`).src=asset(card.frontImage);
     document.getElementById(`compare-object-${key}`).setAttribute('aria-label',`${key.toUpperCase()} · ${card.title}，可拖曳或用方向鍵移動`);
     document.getElementById(`compare-select-${key}`).textContent=`${key.toUpperCase()} · ${card.title}`;
@@ -290,6 +302,7 @@
       case 'advance':E.advance(state);persist();render();break;
       case 'confirm-answer':{const answer=target.dataset.answer;E.submit(state,answer);closeModal();persist();render();break;}
       case 'adjudicate':E.adjudicate(state,target.dataset.verdict,document.getElementById('missing-item')?.checked);persist();render();break;
+      case 'sequence-add':case 'sequence-undo':case 'sequence-clear':updateSequence(action,target.dataset.letter);break;
       case 'view':view(target.dataset.card);break;
       case 'item':viewer(E.itemCard(state,target.dataset.item));break;
       case 'solution':{const c=E.current(state);if(c.backImage&&state.answers[c.id]&&state.answers[c.id].status!=='pending')viewer({...c,title:'解決方案',frontImage:c.backImage});break;}
@@ -320,13 +333,18 @@
     if(event.target.id==='answer-form'){
       event.preventDefault();const c=E.current(state),data=new FormData(event.target);if(!c)return;
       let answer=data.get('answer');
+      if(P.puzzles[c.id].inputType==='coordinate-select'){
+        const column=data.get('coordinateColumn'),row=data.get('coordinateRow'),options=P.puzzles[c.id].coordinateOptions;
+        if(!options.columns.includes(column)||!options.rows.includes(row)){toast('請選擇橫排字母與直排數字。');return;}
+        answer=column+row;
+      }
       if(P.puzzles[c.id].inputType==='item-orientation'){
         const item=data.get('selectedItem'),angle=data.get('rotation');
         if(!state.inventory.includes(item)||!['0','90','180','270'].includes(angle)){toast('請選擇已取得的物品與卡片方向。');return;}
         answer=`${item}:${angle}`;
       }
       if(!String(answer??'').trim())return;
-      if(E.answerBlockers(state,c.id).length){toast('請先取得關鍵物品，再作答。');return;}
+      if(E.answerBlockers(state,c.id).length){toast(E.ITEM_LOCK_MESSAGE);return;}
       showModal('確定送出這個解答？',`<p>送出後答案即鎖定，無法重答。</p><div class="recorded-answer">${esc(answerLabel(c.id,answer))}</div><div class="modal-actions">${button('再想一想','close',true)}${button('確定作答','confirm-answer',false,`data-answer="${esc(answer)}"`)}</div>`);
     }else if(event.target.id==='ending-form'){
       event.preventDefault();const id=new FormData(event.target).get('leftItem');if(!D.items[id])return;

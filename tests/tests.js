@@ -24,7 +24,7 @@
   test('教學答錯只記一次 X 並可以繼續',()=>{const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);E.submit(s,'red');assert(E.stats(s).errors===1);throws(()=>E.submit(s,'purple'));E.advance(s);assert(E.current(s).id==='light');});
   test('未作答無法翻越謎題',()=>{const s=atPuzzle('p14');throws(()=>E.advance(s));throws(()=>E.submit(s,'  '));});
   test('藍色帷幕完成設置才開始計時',()=>{const s=E.fresh(10);assert(E.stats(s,10000).elapsed===0);const p=playing();assert(p.startedAt===2000);assert(E.stats(p,62000).elapsed===60000);});
-  test('全形字與英文大小寫正規化',()=>{assert(P.check('p24',' Ｅｉｎｓｔｅｉｎ ')===true);assert(P.check('p12','Ｘ')===true);});
+  test('全形字與英文大小寫正規化',()=>{assert(P.check('p24',' Ｅｉｎｓｔｅｉｎ ')===true);assert(P.check('p12','Ｘ')===true);assert(P.check('p12','*')===true);assert(P.check('p12','＊')===true);assert(P.check('p12','+')===false);});
   test('14 號以 6 自動判定並推進到新版 15 號圖片',()=>{const s=atPuzzle('p14');E.submit(s,'6');assert(s.answers.p14.correct&&s.answers.p14.status==='verified');assert(E.stats(s).errors===0);E.advance(s);assert(E.current(s).id==='p15');assert(E.current(s).frontImage.endsWith('005-箭頭方向-題目3_改.png'));const wrong=atPuzzle('p14');E.submit(wrong,'4');assert(wrong.answers.p14.correct===false&&E.stats(wrong).errors===1);});
   test('15、34 號座標忽略標點、空白與全半形，錯誤或多個座標仍計一次錯誤',()=>{
     const cases=[['p15',['C3','3C','c3','3c','Ｃ３','C,3','C.3','C3.','C3。','C/3','C-3','C：3','(C3)','「C3」','C_3','C 3','3 C','Ｃ，３。','（３　ｃ）','C＋3'],['C4','3B','C3/D2','C3C3','3C4','---']],['p34',['2D','D2','d2','２Ｄ','D,2','2 D','Ｄ，２。','（２　ｄ）','D/2','2＋D'],['D3','2C','D2/C3','D2D2','2D3','---']]];
@@ -46,20 +46,22 @@
     }
   });
   test('新增答案及別名自動核對，包括巴黎、Parris、III、逆及 B2 座標',()=>{
-    const cases={p17:['237'],p19:['7'],p20:['14270'],p26:['A','巴黎','Parris','Paris','ａ'],p27:['2'],p30:['G'],p31:['3','III','iii'],p38:['D'],p40:['B'],p42:['2'],p45:['D'],p48:['LHFHK','ｌ ｈ ｆ ｈ ｋ','L-H-F-H-K'],p49:['逆時針','逆','counterclockwise'],p50:['B2','2B','Ｂ，２。','2 b'],p52:['A'],p53:['插頭沒插']};
+    const cases={p17:['237'],p19:['7'],p20:['14270'],p26:['A','巴黎','Parris','Paris','ａ'],p27:['2'],p30:['G'],p31:['3','III','iii'],p38:['D'],p40:['B'],p42:['2'],p45:['D'],p48:['LHFHK','ｌ ｈ ｆ ｈ ｋ','L-H-F-H-K'],p49:['逆時針','逆','counterclockwise'],p50:['B2','2B','Ｂ，２。','2 b'],p52:['A'],p53:['插頭沒插好']};
     for(const [id,answers] of Object.entries(cases))for(const answer of answers){const s=atPuzzle(id);s.inventory=[...new Set([...s.inventory,...P.puzzles[id].required])];E.submit(s,answer);assert(s.answers[id].correct&&s.answers[id].mode==='automatic',id+': '+answer);assert(E.stats(s).errors===0);}
     assert(!P.check('p48','LHFH'));assert(!P.check('p48','LHHFK'));assert(!P.check('p50','B3'));assert(!P.check('p50','B2 C3'));
   });
   test('自動判錯只記一次並鎖定答案，可依指示繼續',()=>{const s=atPuzzle('p17');E.submit(s,'test');assert(s.answers.p17.correct===false&&E.stats(s).errors===1);throws(()=>E.adjudicate(s,'correct'));throws(()=>E.submit(s,'237'));E.advance(s);assert(E.current(s).id==='yellow-009');});
-  test('17、20、24、34 缺關鍵物品時禁止作答，不扣分、不留下答案',()=>{
-    for(const [id,item] of [['p17','card777'],['p20','circuit'],['p24','cipher'],['p34','note']]){const s=atPuzzle(id,false),before=JSON.stringify(s);assert(E.canReveal(s,id));throws(()=>E.submit(s,P.puzzles[id].answers[0]));assert(JSON.stringify(s)===before);throws(()=>E.advance(s));s.inventory.push(item);E.submit(s,P.puzzles[id].answers[0]);assert(s.answers[id].correct&&E.stats(s).errors===0);}
+  test('17、20、23、24、34、48 缺關鍵物品時禁止作答，不扣分、不留下答案',()=>{
+    for(const [id,item] of [['p17','card777'],['p20','circuit'],['p23','keys'],['p24','cipher'],['p34','note'],['p48','disc']]){const s=atPuzzle(id,false),before=JSON.stringify(s);assert(E.canReveal(s,id));throws(()=>E.submit(s,P.puzzles[id].answers[0]));assert(JSON.stringify(s)===before);throws(()=>E.advance(s));s.inventory.push(item);E.submit(s,P.puzzles[id].answers[0]);assert(s.answers[id].correct&&E.stats(s).errors===0);}
   });
-  test('26 取得手電筒前禁止公開、查看、作答、提示及前進，已讀舊紀錄也不能繞過',()=>{
+  test('26 公開需手電筒，作答需手電筒及電池，缺任一物品不能作答',()=>{
     const s=atPuzzle('p26',false),before=JSON.stringify(s);assert(!E.canReveal(s,'p26')&&!E.canView(s,'p26'));throws(()=>E.submit(s,'A'));throws(()=>E.hint(s));throws(()=>E.advance(s));assert(JSON.stringify(s)===before);
-    s.inventory.push('flashlight');assert(E.canReveal(s,'p26')&&E.canView(s,'p26'));E.submit(s,'巴黎');assert(s.answers.p26.correct&&E.stats(s).errors===0);
+    s.inventory.push('flashlight');assert(E.canReveal(s,'p26')&&E.canView(s,'p26'));const unlit=JSON.stringify(s);throws(()=>E.submit(s,'巴黎'));assert(JSON.stringify(s)===unlit);assert(E.answerBlockers(s,'p26').includes('batteries'));
+    const batteriesOnly=E.clone(s);batteriesOnly.inventory=batteriesOnly.inventory.filter(id=>id!=='flashlight');batteriesOnly.inventory.push('batteries');assert(!E.canReveal(batteriesOnly,'p26'));throws(()=>E.submit(batteriesOnly,'A'));assert(!batteriesOnly.answers.p26&&E.stats(batteriesOnly).errors===0);
+    s.inventory.push('batteries');assert(E.answerBlockers(s,'p26').length===0);E.submit(s,'巴黎');assert(s.answers.p26.correct&&E.stats(s).errors===0);
   });
   test('不憑推測增加物品限制，並接受合理中文表述',()=>{const s=atPuzzle('p24');E.submit(s,'Einstein');assert(E.stats(s).errors===0);assert(P.check('p12','按下計算機上的 X 鍵'));});
-  test('其他題目保留明確物品缺件的 2 X',()=>{for(const answer of ['A','B']){const s=atPuzzle('p23');E.submit(s,answer);assert(E.stats(s).errors===2);}});
+  test('其他題目保留明確物品缺件的 2 X',()=>{for(const answer of ['B','A']){const s=atPuzzle('p40');E.submit(s,answer);assert(E.stats(s).errors===2);}});
   test('28 僅接受已取得物品，三稜鏡正確，其他物品錯誤',()=>{
     const s=atPuzzle('p28');throws(()=>E.submit(s,'prism'));assert(!s.answers.p28);s.inventory.push('prism');E.submit(s,'prism');assert(s.answers.p28.correct&&E.stats(s).errors===0);
     const wrong=atPuzzle('p28');E.submit(wrong,'score');assert(!wrong.answers.p28.correct&&E.stats(wrong).errors===1);
@@ -143,11 +145,26 @@
   });
   test('UI 物品限制擋住表單，26 在主畫面、歷史及比對均不提前公開',()=>{
     const win=frame.contentWindow,doc=frame.contentDocument;
-    for(const [id,item] of [['p17','card777'],['p20','circuit'],['p24','cipher'],['p34','note']]){const s=atPuzzle(id,false);win.GameTest.setState(s);assert(doc.querySelector('.game-card'));assert(!doc.querySelector('#answer-form'));assert(doc.querySelector('.interaction').textContent.includes(D.items[item].name));s.inventory.push(item);win.GameTest.setState(s);assert(doc.querySelector('#answer-form'));}
-    const s=atPuzzle('p26',false);win.GameTest.setState(s);const source=encodeURIComponent('005-關閉顯示器-題目3_改.png');assert(!doc.querySelector('.game-card')&&!doc.querySelector('#answer-form')&&!doc.body.innerHTML.includes(source));
+    for(const [id,item] of [['p17','card777'],['p20','circuit'],['p23','keys'],['p24','cipher'],['p34','note'],['p48','disc']]){const s=atPuzzle(id,false);win.GameTest.setState(s);assert(doc.querySelector('.game-card'));assert(!doc.querySelector('#answer-form'));assert(doc.querySelector('.interaction p').textContent==='請先取得相應道具，再回來解開這道謎題。');assert(!doc.querySelector('.interaction').textContent.includes(D.items[item].name));s.inventory.push(item);win.GameTest.setState(s);assert(doc.querySelector('#answer-form'));}
+    const flashlight=atPuzzle('blue-003');flashlight.inventory.push('flashlight');win.GameTest.setState(flashlight);assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);
+    const s=atPuzzle('p26',false);win.GameTest.setState(s);const source=encodeURIComponent('005-關閉顯示器-題目3_改.png');assert(!doc.querySelector('.game-card')&&!doc.querySelector('#answer-form')&&!doc.body.innerHTML.includes(source));assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);
     doc.querySelector('[data-action="history"]').click();assert(!doc.querySelector('#modal [data-card="p26"]'));doc.getElementById('modal-close').click();
     const compare=doc.createElement('button');compare.dataset.action='compare';doc.body.append(compare);compare.click();assert(!doc.querySelector('#compare-a option[value="p26"]'));assert(!doc.querySelector('#compare-b option[value="p26"]'));assert(!doc.getElementById('modal-content').innerHTML.includes(source));doc.getElementById('modal-close').click();compare.remove();
-    s.inventory.push('flashlight');win.GameTest.setState(s);assert(doc.querySelector('.game-card').src.includes(source));assert(doc.querySelector('#answer-form'));assert(!doc.body.innerHTML.includes(encodeURIComponent('004-手電筒-物品13.jpg')));
+    s.inventory.push('flashlight');win.GameTest.setState(s);assert(doc.querySelector('.game-card').src.includes(source));assert(!doc.querySelector('#answer-form'));assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);assert(!doc.body.innerHTML.includes(encodeURIComponent('004-手電筒-物品13.jpg')));
+    s.inventory.push('batteries');win.GameTest.setState(s);assert(doc.querySelector('#answer-form'));assert(doc.body.innerHTML.includes(encodeURIComponent('004-手電筒-物品13.jpg')));
+  });
+  test('UI 15、34、50 依各題範圍選座標，確認可取消且正誤計分正確',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const [id,columns,rows,letter,digit] of [['p15','ABCDEF','123456','C','3'],['p34','ABCD','1234','D','2'],['p50','ABCD','12345','B','2']]){
+      win.GameTest.setState(atPuzzle(id));const column=doc.getElementById('answer-column'),row=doc.getElementById('answer-row');
+      assert([...column.options].filter(o=>o.value).map(o=>o.value).join('')===columns);assert([...row.options].filter(o=>o.value).map(o=>o.value).join('')===rows);assert(column.value===''&&row.value==='');assert(!doc.querySelector('#answer-form input[type="text"]'));
+      assert(doc.querySelector('.coordinate-fields label[for="answer-column"]').textContent.includes(columns[0]+'–'+columns.at(-1)));assert(doc.querySelector('.coordinate-fields label[for="answer-row"]').textContent.includes(rows[0]+'–'+rows.at(-1)));
+      doc.getElementById('answer-form').requestSubmit();assert(!doc.getElementById('modal').open&&!win.GameTest.getState().answers[id]);
+      column.value=letter;doc.getElementById('answer-form').requestSubmit();assert(!doc.getElementById('modal').open&&!win.GameTest.getState().answers[id]);
+      row.value=digit;doc.getElementById('answer-form').requestSubmit();assert(doc.querySelector('#modal .recorded-answer').textContent===letter+digit);doc.querySelector('#modal [data-action="close"]').click();assert(!win.GameTest.getState().answers[id]&&column.value===letter&&row.value===digit);
+      doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers[id].correct&&win.GameTest.getState().answers[id].answer===letter+digit);assert(!doc.querySelector('#answer-form'));
+      win.GameTest.setState(atPuzzle(id));doc.getElementById('answer-column').value='A';doc.getElementById('answer-row').value='1';doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers[id].correct===false&&E.stats(win.GameTest.getState()).errors===1);
+    }
   });
   test('UI 28 選單只列已取得物品，顯示物品名稱並以三稜鏡正確核對',()=>{
     const win=frame.contentWindow,doc=frame.contentDocument,s=atPuzzle('p28');s.inventory.push('prism','note');win.GameTest.setState(s);
@@ -162,14 +179,24 @@
     doc.getElementById('answer-form').requestSubmit();assert(!doc.getElementById('modal').open);doc.querySelector('input[name="rotation"][value="180"]').checked=true;doc.getElementById('answer-form').requestSubmit();assert(doc.querySelector('#modal .recorded-answer').textContent.includes('電子卡 · 旋轉 180 度'));
     doc.querySelector('#modal [data-action="close"]').click();assert(!win.GameTest.getState().answers.p46);doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p46.answer==='electronic:180'&&win.GameTest.getState().answers.p46.correct);assert(doc.querySelector('.recorded-answer').textContent==='電子卡 · 旋轉 180 度');
   });
-  test('UI 53 不加題目文字，四個選項只接受插頭沒插',()=>{
-    const win=frame.contentWindow,doc=frame.contentDocument;assert(P.puzzles.p53.prompt==='');assert(P.puzzles.p53.choices.length===4);
-    for(const answer of ['左側開關未打開','插頭沒插']){win.GameTest.setState(atPuzzle('p53'));assert(!doc.querySelector('.input-label'));assert(doc.querySelectorAll('input[name="answer"]').length===4);assert(!doc.querySelector('input[name="answer"]:checked'));doc.querySelector(`input[value="${answer}"]`).checked=true;doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p53.correct===(answer==='插頭沒插'));}
+  test('UI 48 用 A–N 依序選答，可重複、刪除及清空，取消確認保留順序',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument,s=atPuzzle('p48');win.GameTest.setState(s);
+    const field=doc.getElementById('answer'),click=letter=>doc.querySelector(`[data-action="sequence-add"][data-letter="${letter}"]`).click();
+    assert(field.readOnly&&field.value==='');assert([...doc.querySelectorAll('[data-action="sequence-add"]')].map(b=>b.dataset.letter).join('')==='ABCDEFGHIJKLMN');assert(doc.getElementById('sequence-undo').disabled&&doc.getElementById('sequence-clear').disabled);
+    doc.getElementById('answer-form').requestSubmit();assert(!doc.getElementById('modal').open&&!win.GameTest.getState().answers.p48);
+    click('H');click('H');assert(field.value==='HH'&&!doc.getElementById('modal').open);doc.getElementById('sequence-undo').click();assert(field.value==='H');doc.getElementById('sequence-clear').click();assert(field.value===''&&doc.getElementById('sequence-undo').disabled&&doc.getElementById('sequence-clear').disabled);
+    [...'LHFHK'].forEach(click);assert(field.value==='LHFHK');doc.getElementById('answer-form').requestSubmit();assert(doc.querySelector('#modal .recorded-answer').textContent==='LHFHK');doc.querySelector('#modal [data-action="close"]').click();assert(field.value==='LHFHK'&&!win.GameTest.getState().answers.p48);
+    doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p48.correct&&E.stats(win.GameTest.getState()).errors===0);assert(!doc.querySelector('[data-action="sequence-add"]'));
+    win.GameTest.setState(s);[...'LHFH'].forEach(click);doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p48.correct===false&&E.stats(win.GameTest.getState()).errors===1);
   });
-  await testAsync('28、46、53 新作答區在桌面、390px 與 320px 不溢出，方向圖片完整顯示',async()=>{
+  test('UI 53 不加題目文字，四個選項只接受插頭沒插好',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;assert(P.puzzles.p53.prompt==='');assert(P.puzzles.p53.choices.length===4);
+    for(const answer of ['左側開關未打開','插頭沒插好']){win.GameTest.setState(atPuzzle('p53'));assert(!doc.querySelector('.input-label'));assert(doc.querySelectorAll('input[name="answer"]').length===4);assert(!doc.querySelector('input[name="answer"]:checked'));doc.querySelector(`input[value="${answer}"]`).checked=true;doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p53.correct===(answer==='插頭沒插好'));}
+  });
+  await testAsync('15、23、28、34、46、48、50、53 作答區在桌面、390px 與 320px 不溢出，方向圖片完整顯示',async()=>{
     const win=frame.contentWindow,doc=frame.contentDocument;
-    for(const width of [1280,390,320])for(const id of ['p28','p46','p53']){
-      frame.style.width=width+'px';const s=atPuzzle(id);s.inventory.push('electronic','prism','note');win.GameTest.setState(s);
+    for(const width of [1280,390,320])for(const id of ['p15','p23','p28','p34','p46','p48','p50','p53']){
+      frame.style.width=width+'px';const s=atPuzzle(id);s.inventory=[...new Set([...s.inventory,'electronic','prism','note'])];win.GameTest.setState(s);
       if(id==='p46'){const select=doc.getElementById('answer-item');select.value='electronic';select.dispatchEvent(new win.Event('change',{bubbles:true}));}
       await new Promise(resolve=>setTimeout(resolve,100));assert(doc.documentElement.scrollWidth<=win.innerWidth,id+' overflow at '+width);
       for(const img of doc.querySelectorAll('.orientation-preview img')){const rect=img.getBoundingClientRect(),box=img.parentElement.getBoundingClientRect();assert(img.naturalWidth>0);assert(rect.left>=box.left-1&&rect.right<=box.right+1&&rect.top>=box.top-1&&rect.bottom<=box.bottom+1,'Rotated image must fit preview');}
@@ -250,7 +277,7 @@
   frame.contentWindow.GameTest.setState(playing());
   const preview=new URLSearchParams(location.search).get('preview');
   if(preview){
-    const isCompare=preview.startsWith('compare'),puzzle=/^(p28|p46|p53|p26)/.exec(preview)?.[1],previewState=puzzle?atPuzzle(puzzle,puzzle!=='p26'):isCompare?atPuzzle('p14'):playing();
+    const isCompare=preview.startsWith('compare'),puzzle=/^(p15|p28|p46|p48|p53|p26)/.exec(preview)?.[1],previewState=puzzle?atPuzzle(puzzle,puzzle!=='p26'):isCompare?atPuzzle('p14'):playing();
     if(isCompare){previewState.inventory.push('note');previewState.visited.push('yellow-003');}
     if(puzzle&&puzzle!=='p26')previewState.inventory.push('electronic','prism','note');
     previewState.startedAt=Date.now()-738000;frame.contentWindow.GameTest.setState(previewState);document.querySelector('h1').style.display='none';output.style.display='none';document.body.style.margin='0';frame.style.width=preview.includes('mobile')?'390px':'1440px';frame.style.height=puzzle?(preview.includes('mobile')?'1000px':'1800px'):'1100px';
