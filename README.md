@@ -51,6 +51,7 @@
 
 ```text
 index.html                瀏覽器入口
+封面圖.webp               首頁封面（保留完整圖片比例）
 css/style.css             響應式介面
 js/cards.js               卡牌、路線、物品與結局資料
 js/puzzles.js             題型、來源確認答案與已確認依賴
@@ -70,7 +71,7 @@ tests/tests.js            純邏輯與瀏覽器操作回歸測試
 
 目前已部署至 Vercel。以下保留部署設定，供後續更新或重新部署使用。
 
-將 `index.html`、`css/`、`js/` 及 `00-開場/` 至 `05-結局/` 的圖片一併提交 GitHub，保留原檔名與目錄。Vercel 匯入該儲存庫後，Root Directory 選含 `index.html` 的資料夾，Framework Preset 選 **Other**，Build Command 開啟 Override 並留空，Output Directory 使用 **`.`**。本專案沒有安裝、建置或環境變數需求；不需 SPA 重寫。設定依 [Vercel 官方靜態專案說明](https://vercel.com/docs/builds/configure-a-build#skip-build-step)。
+將 `index.html`、`封面圖.webp`、`css/`、`js/` 及 `00-開場/` 至 `05-結局/` 的圖片一併提交 GitHub，保留原檔名與目錄。Vercel 匯入該儲存庫後，Root Directory 選含 `index.html` 的資料夾，Framework Preset 選 **Other**，Build Command 開啟 Override 並留空，Output Directory 使用 **`.`**。本專案沒有安裝、建置或環境變數需求；不需 SPA 重寫。設定依 [Vercel 官方靜態專案說明](https://vercel.com/docs/builds/configure-a-build#skip-build-step)。
 
 存檔仍在玩家瀏覽器的 localStorage；本機、Vercel 預覽網址及正式網域各自獨立，不會自動搬移或跨裝置同步。若更換正式網域，新網址不會自動沿用舊網址的遊戲進度。
 
