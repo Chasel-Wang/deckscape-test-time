@@ -103,7 +103,39 @@
   test('後退的系統時鐘不會產生負時間',()=>{assert(E.stats(playing(),0).elapsed===0);});
   const frame=document.getElementById('ui');
   const ready=()=>new Promise((resolve,reject)=>{let count=0;const timer=setInterval(()=>{try{if(frame.contentWindow.GameTest){clearInterval(timer);resolve();}else if(count++>100){clearInterval(timer);reject(new Error('UI did not initialize'));}}catch(e){clearInterval(timer);reject(e);}},50);});
-  await testAsync('瀏覽器 UI 載入與開始遊戲',async()=>{await ready();const doc=frame.contentDocument;assert(doc.title.includes('口袋密室'));doc.querySelector('[data-action="new"]').click();assert(frame.contentWindow.GameTest.getState().phase==='intro');assert(doc.querySelector('.game-card'));assert(!doc.querySelector('[data-action="catalog"]'));});
+  await testAsync('首頁進入實驗室在閱讀規則前鎖定，保留原閱讀按鈕',async()=>{
+    await ready();const win=frame.contentWindow,doc=frame.contentDocument;assert(doc.title.includes('口袋密室'));
+    assert(doc.querySelector('[data-action="new"]').disabled);assert(doc.querySelector('[data-action="rules"]'));assert(doc.getElementById('rules-button'));
+    doc.querySelector('[data-action="new"]').click();assert(win.GameTest.getState()===null);assert(!doc.getElementById('modal').open);
+  });
+  test('兩個閱讀規則入口都要求確認，關閉視窗不解鎖也不產生存檔',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const selector of ['[data-action="rules"]','#rules-button']){
+      doc.querySelector(selector).click();const reader=doc.getElementById('rules-reader'),accept=doc.querySelector('[data-action="rules-accept"]');
+      assert(reader.querySelectorAll('.rule-list li').length===D.rulesText.length);assert(reader.scrollHeight>reader.clientHeight);assert(accept.disabled);
+      accept.click();assert(win.GameTest.getState()===null&&doc.getElementById('modal').open);
+      if(selector==='#rules-button')doc.getElementById('modal').close();else doc.getElementById('modal-close').click();
+      assert(doc.querySelector('[data-action="new"]').disabled);assert(win.GameTest.getState()===null);
+    }
+  });
+  test('直接觸發開始仍要求閱讀，捲到底但未確認也不能開始',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument,trigger=doc.createElement('button');trigger.dataset.action='new';doc.body.append(trigger);trigger.click();trigger.remove();
+    assert(doc.getElementById('modal').open&&win.GameTest.getState()===null);const reader=doc.getElementById('rules-reader');reader.scrollTop=reader.scrollHeight;reader.dispatchEvent(new win.Event('scroll'));
+    assert(!doc.querySelector('[data-action="rules-accept"]').disabled);doc.getElementById('modal-close').click();assert(doc.querySelector('[data-action="new"]').disabled);assert(win.GameTest.getState()===null);
+  });
+  await testAsync('桌面及手機規則可完整閱讀，確認只解鎖入口，點進入才開始',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const width of [390,320,1280]){
+      frame.style.width=width+'px';doc.querySelector('[data-action="rules"]').click();await new Promise(resolve=>setTimeout(resolve,100));
+      const reader=doc.getElementById('rules-reader'),accept=doc.querySelector('[data-action="rules-accept"]'),rect=accept.getBoundingClientRect();
+      assert(doc.getElementById('modal-content').scrollWidth<=doc.getElementById('modal-content').clientWidth,'Rules overflow at '+width);
+      assert(rect.top>=0&&rect.bottom<=win.innerHeight,'Rules confirmation must stay visible');
+      reader.scrollTop=reader.scrollHeight;reader.dispatchEvent(new win.Event('scroll'));assert(!accept.disabled);
+      if(width!==1280){doc.getElementById('modal-close').click();assert(doc.querySelector('[data-action="new"]').disabled);}else accept.click();
+    }
+    assert(win.GameTest.getState()===null);assert(!doc.querySelector('[data-action="new"]').disabled);assert(!doc.getElementById('modal').open);
+    doc.querySelector('[data-action="new"]').click();assert(win.GameTest.getState().phase==='intro');assert(doc.querySelector('.game-card'));assert(!doc.querySelector('[data-action="catalog"]'));
+  });
   test('未解鎖卡牌不出現在正式畫面的圖片路徑',()=>{const doc=frame.contentDocument;assert(!doc.body.innerHTML.includes(encodeURIComponent('結局D')));assert(!doc.body.innerHTML.includes(encodeURIComponent('光盤-物品6')));});
   test('作答確認取消不記錄答案，確認才鎖定',()=>{
     const win=frame.contentWindow,doc=frame.contentDocument;const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);win.GameTest.setState(s);
@@ -146,7 +178,12 @@
   });
   test('UI 新答案自動核對，不再要求人工選擇正誤',()=>{const win=frame.contentWindow,doc=frame.contentDocument;win.GameTest.setState(atPuzzle('p17'));doc.getElementById('answer').value='237';doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p17.correct&&win.GameTest.getState().answers.p17.mode==='automatic');assert(!doc.querySelector('[data-action="adjudicate"]'));doc.querySelector('[data-action="advance"]').click();assert(E.current(win.GameTest.getState()).id==='yellow-009');});
   test('筆記與答案以純文字呈現，存檔可恢復',()=>{const win=frame.contentWindow,doc=frame.contentDocument;const notes=doc.getElementById('notes');notes.value='<img src=x onerror=alert(1)>';notes.dispatchEvent(new Event('input',{bubbles:true}));win.GameTest.reload();assert(doc.getElementById('notes').value===notes.value);assert(!doc.querySelector('img[src="x"]'));});
-  test('UI 重開確認可取消且保留進度',()=>{const win=frame.contentWindow,doc=frame.contentDocument;const before=JSON.stringify(win.GameTest.getState());doc.querySelector('[data-action="home"]').click();doc.querySelector('[data-action="new"]').click();assert(doc.getElementById('modal').open);doc.querySelector('#modal [data-action="close"]').click();assert(JSON.stringify(win.GameTest.getState())===before);});
+  test('舊存檔可直接繼續，開始新局須重讀規則，取消重開仍保留進度',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument,before=JSON.stringify(win.GameTest.getState());doc.querySelector('[data-action="home"]').click();assert(doc.querySelector('[data-action="new"]').disabled);
+    doc.querySelector('[data-action="continue"]').click();assert(!doc.getElementById('modal').open&&JSON.stringify(win.GameTest.getState())===before);
+    doc.querySelector('[data-action="home"]').click();doc.querySelector('[data-action="rules"]').click();const reader=doc.getElementById('rules-reader');reader.scrollTop=reader.scrollHeight;reader.dispatchEvent(new win.Event('scroll'));doc.querySelector('[data-action="rules-accept"]').click();assert(JSON.stringify(win.GameTest.getState())===before);
+    doc.querySelector('[data-action="new"]').click();assert(doc.querySelector('[data-action="reset-confirm"]'));doc.querySelector('#modal [data-action="close"]').click();assert(JSON.stringify(win.GameTest.getState())===before);
+  });
   test('結局畫面明確標示未核對成績',()=>{const s=E.clone(window.completeFixture);s.answers.p17.correct=null;s.answers.p17.status='unverified';E.finish(s,'electrode',62000);frame.contentWindow.GameTest.setState(s);assert(frame.contentDocument.querySelector('.summary').textContent.includes('暫定成績'));});
   test('待核對作答可以在結算補核對並更新成績',()=>{const doc=frame.contentDocument;doc.querySelector('[data-action="log"]').click();doc.querySelector('[data-action="review"]').click();doc.querySelector('[data-action="review-result"][data-correct="false"]').click();assert(frame.contentWindow.GameTest.getState().answers.p17.correct===false);assert(!doc.querySelector('.summary').textContent.includes('暫定成績'));});
   await testAsync('比對工具只提供已解鎖卡，兩張卡可並排或重疊排列',async()=>{

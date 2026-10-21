@@ -6,6 +6,7 @@
   const memory = new Map();
   let storage;
   let state = null, onHome = true, saveIssue = '', loadIssue = '', toastTimer, comparison = null;
+  let rulesAcknowledged = false, rulesReview = null;
   try { storage = testing ? { getItem: k => memory.get(k) ?? null, setItem: (k,v) => memory.set(k,v) } : localStorage; state = E.load(storage); }
   catch (error) { loadIssue = error.message; }
   const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -23,25 +24,40 @@
   }
   function showModal(title, html, wide = false) {
     comparison?.observer.disconnect(); comparison = null;
+    clearRulesReview();
     if (modal.open) modal.close();
     document.getElementById('modal-title').textContent = title;
     modal.style.width = wide ? '940px' : '650px'; modalContent.innerHTML = html; modal.showModal();
   }
-  function closeModal() { modal.close(); }
-  function rules() {
+  function clearRulesReview() { rulesReview?.observer?.disconnect(); rulesReview=null; }
+  function closeModal() { clearRulesReview(); modal.close(); }
+  function rules(forceReview=false) {
+    const required=!rulesAcknowledged&&(forceReview||onHome||!state);
     const automaticCount=Object.values(P.puzzles).filter(p=>p.answers).length;
     const manualCount=Object.keys(P.puzzles).length-automaticCount;
-    showModal('進入實驗室之前', `<p class="eyebrow">HOW TO PLAY</p><ol class="rule-list">${D.rulesText.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
+    showModal('進入實驗室之前', `${required?'<p class="rules-intro">開始前，請先閱讀完整遊玩規則，再確認已閱讀。</p>':''}<div id="rules-reader" class="rules-reader" tabindex="0" role="region" aria-label="完整遊玩規則"><p class="eyebrow">HOW TO PLAY</p><ol class="rule-list">${D.rulesText.map(t=>`<li>${esc(t)}</li>`).join('')}</ol>
       <div class="notice">${manualCount?`已確認答案的 ${automaticCount} 題會自動判定，其餘 ${manualCount} 題需搭配實體解答核對。`:`全部 ${automaticCount} 題皆會自動判定。有物品解鎖條件的卡牌，須先取得指定物品才能作答或公開。`}</div>
-      <p class="muted">使用方式：點擊卡牌可放大或旋轉；「物品比對」可直接拖曳兩張卡牌，點選後各自旋轉、縮放或調整透明度。進度會自動保存於這個瀏覽器。</p>${button('了解了', 'close')}`);
+      <p class="muted">使用方式：點擊卡牌可放大或旋轉；「物品比對」可直接拖曳兩張卡牌，點選後各自旋轉、縮放或調整透明度。進度會自動保存於這個瀏覽器。</p></div>${required?'<p id="rules-progress" class="rules-progress" role="status">請向下捲動，閱讀完整規則。</p><div class="modal-actions">'+button('我已閱讀並了解規則','rules-accept',false,'disabled aria-describedby="rules-progress"')+'</div>':'<div class="modal-actions">'+button('了解了', 'close')+'</div>'}`);
+    if(!required)return;
+    const reader=document.getElementById('rules-reader');
+    const review={reader,complete:false,observer:null};rulesReview=review;
+    const checkRead=()=>{
+      if(rulesReview!==review||!modal.open||!reader.clientHeight)return;
+      if(reader.scrollTop+reader.clientHeight>=reader.scrollHeight-2)review.complete=true;
+      document.querySelector('[data-action="rules-accept"]').disabled=!review.complete;
+      document.getElementById('rules-progress').textContent=review.complete?'已顯示完整規則，請確認已閱讀。':'請向下捲動，閱讀完整規則。';
+    };
+    reader.addEventListener('scroll',checkRead,{passive:true});
+    review.observer=new ResizeObserver(checkRead);review.observer.observe(reader);checkRead();
   }
   function home() {
     const progress = state ? E.stats(state) : null;
     app.innerHTML = `${dev ? '<div class="developer-bar">開發測試模式 · 所有卡牌檢視可能包含劇透 <button data-action="catalog">素材清單</button></div>' : ''}
       <section class="home"><div class="hero"><div><p class="eyebrow">THE EXPERIMENT BEGINS</p><h1>口袋密室<span>時間測試</span></h1>
         <p class="hero-description">一間封閉的實驗室，一位神祕的博士。<br>線索藏在卡牌之間，出口等待你的發現。<br>準備好，接受這場關於時間的測試。</p>
-        <div class="hero-actions">${state ? button(state.phase === 'ending' ? '查看遊戲結算 <span>↗</span>' : '繼續探索 <span>→</span>', 'continue') + button('開始新遊戲', 'new', true) : button('進入實驗室 <span>→</span>', 'new')}
-        ${!state ? '<button class="text-button" data-action="rules">閱讀遊玩規則 ↗</button>' : ''}</div>
+        <div class="hero-actions">${state ? button(state.phase === 'ending' ? '查看遊戲結算 <span>↗</span>' : '繼續探索 <span>→</span>', 'continue') + button('開始新遊戲', 'new', true,`${rulesAcknowledged?'':'disabled'} aria-describedby="rules-status"`) : button('進入實驗室 <span>→</span>', 'new',false,`${rulesAcknowledged?'':'disabled'} aria-describedby="rules-status"`)}
+        <button class="text-button" data-action="rules">閱讀遊玩規則 ↗</button></div>
+        <p class="rules-home-status" id="rules-status" role="status">${rulesAcknowledged?'已確認遊玩規則，可以開始新遊戲。':'開始新遊戲前，請先閱讀並確認遊玩規則。'}</p>
         <p class="hero-fineprint">${state ? `已保存進度 · ${progress.answered} 題作答 · ${state.phase === 'intro' ? '開場尚未計時' : '經過 ' + time(progress.elapsed)}` : '無需安裝 · 自動存檔 · 隨時繼續'}</p></div>
         <div class="art" aria-hidden="true"><span class="art-label">CASE FILE / 001</span><div class="art-circle"></div><div class="cover-card back-one"></div><div class="cover-card back-two"></div><div class="cover-card main"><div class="tiny">DECKSCAPE · TEST TIME</div><div class="clock-face"></div><div class="cover-name">口袋密室</div><div class="cover-sub">時間測試</div></div><span class="art-bottom">OBSERVE. CONNECT. ESCAPE.</span></div></div>
         <div class="home-meta"><span><strong>單人或同桌協作</strong>一起觀察，共同解謎</span><span><strong>4 組探索牌堆</strong>自由切換，串聯線索</span><span><strong>你的時間，正在流動</strong>依原版規則計時與結算</span></div>
@@ -50,10 +66,14 @@
         ${loadIssue ? `<div class="notice warning">${esc(loadIssue)}</div>` : ''}${saveIssue ? `<div class="notice warning">${esc(saveIssue)}</div>` : ''}</section>`;
   }
   function start() {
-    const run = () => { state = E.fresh(); onHome = false; loadIssue = ''; closeModal(); persist(); render(); };
+    if(!rulesAcknowledged){rules(true);return;}
     if (state || loadIssue) {
       showModal('重新開始這場測試？', '<p>目前的遊戲進度、筆記與作答紀錄將被新的遊戲覆寫。</p><div class="modal-actions">' + button('保留目前進度', 'close', true) + button('確認重新開始', 'reset-confirm') + '</div>');
-    } else run();
+    } else begin();
+  }
+  function begin() {
+    if(!rulesAcknowledged){rules(true);return;}
+    state=E.fresh();onHome=false;loadIssue='';rulesAcknowledged=false;closeModal();persist();render();
   }
   function render() {
     if (onHome || !state) return home();
@@ -258,8 +278,9 @@
   function act(action,target) {
     switch(action) {
       case 'rules':rules();break;
+      case 'rules-accept':if(modal.open&&rulesReview?.complete){rulesAcknowledged=true;closeModal();render();}break;
       case 'new':start();break;
-      case 'reset-confirm':state=E.fresh();onHome=false;loadIssue='';closeModal();persist();render();break;
+      case 'reset-confirm':begin();break;
       case 'continue':onHome=false;render();break;
       case 'home':onHome=true;persist();closeModal();render();break;
       case 'close':closeModal();break;
@@ -319,11 +340,11 @@
     if(event.target.id==='answer-item')updateOrientationOptions();
     if(comparison&&['compare-a','compare-b'].includes(event.target.id)){const key=event.target.id.slice(-1);loadCompareCard(key);selectCompare(key);}
   });
-  document.getElementById('rules-button').addEventListener('click',rules);
+  document.getElementById('rules-button').addEventListener('click',()=>rules());
   document.getElementById('home-link').addEventListener('click',event=>{event.preventDefault();onHome=true;persist();render();});
   document.getElementById('modal-close').addEventListener('click',closeModal);
   modal.addEventListener('click',event=>{if(event.target===modal){const r=modal.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeModal();}});
-  modal.addEventListener('close',()=>{if(!modal.open){comparison?.observer.disconnect();comparison=null;}});
+  modal.addEventListener('close',()=>{if(!modal.open){clearRulesReview();comparison?.observer.disconnect();comparison=null;}});
   window.addEventListener('pagehide',persist);
   window.addEventListener('resize',updateViewer);
   window.addEventListener('storage',event=>{if(event.key!==E.SAVE_KEY||testing)return;try{state=E.load(storage);closeModal();render();toast('已同步另一個分頁的遊戲進度。');}catch(error){toast(error.message);}});
