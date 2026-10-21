@@ -57,7 +57,6 @@
         <p class="hero-description">一間封閉的實驗室，一位神祕的博士。<br>線索藏在卡牌之間，出口等待你的發現。<br>準備好，接受這場關於時間的測試。</p>
         <div class="hero-actions">${state ? button(state.phase === 'ending' ? '查看遊戲結算 <span>↗</span>' : '繼續探索 <span>→</span>', 'continue') + button('開始新遊戲', 'new', true) : button('進入實驗室 <span>→</span>', 'new')}
         <button class="text-button" data-action="rules">閱讀遊玩規則 ↗</button></div>
-        <p class="rules-home-status">開始新遊戲會先顯示遊玩規則，確認後才進入。</p>
         <p class="hero-fineprint">${state ? `已保存進度 · ${progress.answered} 題作答 · ${state.phase === 'intro' ? '開場尚未計時' : '經過 ' + time(progress.elapsed)}` : '無需安裝 · 自動存檔 · 隨時繼續'}</p></div>
         <div class="art" aria-hidden="true"><span class="art-label">CASE FILE / 001</span><div class="art-circle"></div><div class="cover-card back-one"></div><div class="cover-card back-two"></div><div class="cover-card main"><div class="tiny">DECKSCAPE · TEST TIME</div><div class="clock-face"></div><div class="cover-name">口袋密室</div><div class="cover-sub">時間測試</div></div><span class="art-bottom">OBSERVE. CONNECT. ESCAPE.</span></div></div>
         <div class="home-meta"><span><strong>單人或同桌協作</strong>一起觀察，共同解謎</span><span><strong>4 組探索牌堆</strong>自由切換，串聯線索</span><span><strong>你的時間，正在流動</strong>依原版規則計時與結算</span></div>
