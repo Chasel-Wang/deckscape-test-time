@@ -6,28 +6,28 @@
     [12, '你打算如何行動？', null, ['x','×','乘號','乘法鍵','按x','按下x','按乘號','計算機的乘號','計算器的乘號'], '01-黃色帷幕/002-001通關.jpg', '13 號卡明確記載：按下計算器上的 X 號，黑板便滑開。'],
     [14, '哪個數字標記的映像有誤？', null, ['6'], '使用者確認', '映像有誤的數字標記是 6。'],
     [15, '請輸入方塊座標（字母＋數字或數字＋字母）。', null, ['C3','3C'], '使用者確認', '正確方塊的座標是 C3，也可寫成 3C。'],
-    [17, '輸入工具箱的三位數密碼。'],
-    [19, '密碼中的 X 是哪個數字？'],
-    [20, '輸入五位數密碼。', null, null, null, null, ['circuit']],
+    [17, '輸入工具箱的三位數密碼。', null, ['237'], '使用者確認', '工具箱的密碼是 237。'],
+    [19, '密碼中的 X 是哪個數字？', null, ['7'], '使用者確認', 'X 代表 7。'],
+    [20, '輸入五位數密碼。', null, ['14270'], '使用者確認', '五位數密碼是 14270。', ['circuit']],
     [23, '哪一把鑰匙能打開衣櫃？請輸入鑰匙圖片上的字母。', null, ['A'], '使用者確認', '正確的鑰匙是 A。', ['keys']],
     [24, '破譯衣櫃中的單詞。', null, ['einstein','愛因斯坦','爱因斯坦'], '02-綠色帷幕/003-002通關.jpg', '25 號卡明確記載：說出 Einstein 後，衣櫃的活動底板打開。'],
-    [26, '你要關閉哪一台顯示器？', ['Paris|巴黎 Paris','London|倫敦 London','Berlin|柏林 Berlin','Rome|羅馬 Rome'], null, null, null, ['flashlight', 'batteries']],
-    [27, '你要選哪一個體位？', ['1|1','2|2','3|3','4|4']],
-    [28, '如何同時啟動所有光線感應器？'],
-    [30, '哪一把才是正確的鑰匙？請描述位置。'],
-    [31, '你要打開哪一把鎖？', ['1|第一把 · I','2|第二把 · II','3|第三把 · III'], ['3','第三把','iii'], '02-綠色帷幕/011-010通關.jpg', '32 號卡明確記載：將鑰匙插入第三把鎖並轉動，三把鎖同時打開。'],
+    [26, '你要關閉哪一台顯示器？請輸入字母或城市名稱。', null, ['A','巴黎','Paris','Parris'], '使用者確認', '關閉 A，也就是巴黎（Paris）的顯示器。'],
+    [27, '你要選哪一個體位？', ['1|1','2|2','3|3','4|4'], ['2'], '使用者確認', '正確體位是 2。'],
+    [28, '放什麼物品？', null, ['prism','三稜鏡','三棱鏡'], '使用者確認', '放入三稜鏡。'],
+    [30, '哪一把才是正確的鑰匙？請輸入圖片上的字母。', null, ['G'], '使用者確認', '正確的鑰匙是 G。'],
+    [31, '你要打開哪一把鎖？', ['1|第一把 · I','2|第二把 · II','3|第三把 · III'], ['3','第三把','III'], '使用者確認', '將鑰匙插入第三把鎖並轉動。'],
     [34, '請輸入方塊座標（數字＋字母或字母＋數字）。', null, ['2D','D2'], '使用者確認', '正確方塊的座標是 2D，也可寫成 D2。'],
     [36, '哪一粒膠囊是特殊的？請輸入圖片上的字母。', null, ['H'], '使用者確認', '特殊的膠囊是 H。'],
-    [38, '哪一個符號代表六？請描述位置。'],
-    [40, '要把膠囊放進哪個燒瓶？', ['1|從左數第一個','2|從左數第二個','3|從左數第三個','4|從左數第四個'], null, null, null, ['capsule']],
-    [42, '缺少的芯片是哪一塊？', ['2|2','3|3','4|4','6|6','8|8','9|9']],
-    [45, '你要拿出哪一本書？'],
-    [46, '描述電子卡插入的方向。', null, null, null, null, ['electronic']],
-    [48, '輸入按鈕的顏色順序。', null, null, null, null, ['disc']],
-    [49, '應朝哪個方向轉動轉盤？', ['clockwise|順時針','counterclockwise|逆時針']],
-    [50, '四個座標所指的是哪個符號？'],
-    [52, '藍色電極應插在哪裡？請描述位置。', null, null, null, null, ['electrode']],
-    [53, '機器為什麼沒有開始運行？']
+    [38, '哪一個符號代表六？請輸入圖片上的字母。', null, ['D'], '使用者確認', '代表六的符號是 D。'],
+    [40, '要把膠囊放進哪個燒瓶？請輸入圖片上的字母。', null, ['B'], '使用者確認', '把膠囊放進 B 燒瓶。', ['capsule']],
+    [42, '缺少的芯片是哪一塊？', ['2|2','3|3','4|4','6|6','8|8','9|9'], ['2'], '使用者確認', '缺少的是 2 號芯片。'],
+    [45, '你要拿出哪一本書？請輸入圖片上的字母。', null, ['D'], '使用者確認', '選擇 D 書本。'],
+    [46, '選擇要插入的物品，再選擇卡片方向。', null, ['electronic:180'], '使用者確認', '使用電子卡，並旋轉 180 度。', ['electronic']],
+    [48, '輸入按鈕的字母順序。', null, ['LHFHK'], '使用者確認', '正確順序是 L → H → F → H → K。', ['disc']],
+    [49, '應朝哪個方向轉動轉盤？', ['clockwise|順時針','counterclockwise|逆時針'], ['counterclockwise','逆時針','逆'], '使用者確認', '朝逆時針方向轉動。'],
+    [50, '請輸入所選符號的座標。', null, ['B2','2B'], '使用者確認', '正確座標是 B2，也可寫成 2B。'],
+    [52, '藍色電極應插在哪裡？請輸入圖片上的字母。', null, ['A'], '使用者確認', '將藍色電極插入 A。', ['electrode']],
+    [53, '', ['左側開關未打開|左側開關未打開','插頭沒插|插頭沒插','右下方電線接錯|右下方電線接錯','中央儀表旋鈕未調好|中央儀表旋鈕未調好'], ['插頭沒插'], '使用者確認', '機器的插頭沒有插上。']
   ];
   definitions.forEach(([n, prompt, choices, answers, source, explanation, required = []]) => {
     const id = 'p' + n;
@@ -37,6 +37,14 @@
   });
   puzzles.p15.answerFormat = 'coordinate';
   puzzles.p34.answerFormat = 'coordinate';
+  puzzles.p50.answerFormat = 'coordinate';
+  puzzles.p48.answerFormat = 'sequence';
+  puzzles.p28.inputType = 'inventory';
+  puzzles.p46.inputType = 'item-orientation';
+  puzzles.p17.answerRequires = ['card777'];
+  puzzles.p20.answerRequires = ['circuit'];
+  puzzles.p24.answerRequires = ['cipher'];
+  puzzles.p34.answerRequires = ['note'];
   // The same action has several natural Chinese spellings. Do not punish a wording variant.
   ['計算機', '計算器'].forEach(device => {
     ['', '按', '按下', '按一下'].forEach(verb => {
@@ -50,7 +58,7 @@
     check(id, answer) {
       const p = puzzles[id];
       // Coordinate separators and decorations do not change the indicated letter and number.
-      const canonical = p.answerFormat === 'coordinate' ? input => normalize(input).replace(/[\p{P}\p{S}]/gu, '') : normalize;
+      const canonical = ['coordinate','sequence'].includes(p.answerFormat) ? input => normalize(input).replace(/[\p{P}\p{S}]/gu, '') : normalize;
       return p.answers ? p.answers.some(a => canonical(a) === canonical(answer)) : null;
     }
   };

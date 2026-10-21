@@ -15,9 +15,17 @@
     return D.cards[D.decks[deck].cards[state.deckPositions[deck]]] || null;
   }
   function visit(state, id) { if (id && !state.visited.includes(id)) state.visited.push(id); }
+  function revealBlockers(state, id) {
+    const required=id==='flashlight-lit'?['flashlight','batteries']:D.cards[id]?.revealRequires||[];
+    return required.filter(item=>!state.inventory.includes(item));
+  }
+  function canReveal(state, id) { return !!D.cards[id] && revealBlockers(state,id).length===0; }
+  function answerBlockers(state, id=current(state)?.id) {
+    return [...new Set([...revealBlockers(state,id),...(P.puzzles[id]?.answerRequires||[])])].filter(item=>!state.inventory.includes(item));
+  }
   function enter(state) {
     const c = current(state);
-    if (c) { visit(state, c.id); if (c.grants && !state.inventory.includes(c.grants)) state.inventory.push(c.grants); }
+    if (c && canReveal(state,c.id)) { visit(state, c.id); if (c.grants && !state.inventory.includes(c.grants)) state.inventory.push(c.grants); }
   }
   function selectDeck(state, id) {
     if (state.phase !== 'playing' || !deckIds.includes(id)) throw new Error('目前無法切換牌堆。');
@@ -28,6 +36,7 @@
     if (state.phase === 'ending') throw new Error('遊戲已結束。');
     const c = current(state);
     if (!c) throw new Error('這組牌堆已探索完畢。');
+    if (!canReveal(state,c.id)) throw new Error('請先取得關鍵物品，再公開這張卡牌。');
     if (c.cardType === 'puzzle' && (!state.answers[c.id] || state.answers[c.id].status === 'pending')) throw new Error('請先完成作答與核對。');
     if (c.cardType === 'choice') throw new Error('請先選擇要留下的物品。');
     if (c.itemId && !state.inventory.includes(c.itemId)) state.inventory.push(c.itemId);
@@ -42,8 +51,15 @@
   function submit(state, answer, now = Date.now()) {
     const c = current(state);
     if (!c || c.cardType !== 'puzzle' || state.answers[c.id]) throw new Error('這題無法再次作答。');
+    const blockers=answerBlockers(state,c.id);
+    if(blockers.length)throw new Error(`請先取得${blockers.map(id=>D.items[id].name).join('、')}，才能作答。`);
     if (!String(answer).trim()) throw new Error('請先填寫你的答案。');
     const p = P.puzzles[c.id], missing = p.required.filter(id => !state.inventory.includes(id));
+    if(p.inputType==='inventory'&&!state.inventory.includes(String(answer).trim()))throw new Error('只能選擇當下已取得的物品。');
+    if(p.inputType==='item-orientation'){
+      const selection=/^([a-z0-9-]+):(0|90|180|270)$/.exec(String(answer).trim());
+      if(!selection||!state.inventory.includes(selection[1]))throw new Error('請從已取得的物品選擇卡片和方向。');
+    }
     const correct = P.check(c.id, answer);
     state.answers[c.id] = { answer: String(answer).trim().slice(0, 1200), at: now, correct,
       status: correct === null ? 'pending' : 'verified', mode: correct === null ? 'manual' : 'automatic', missing,
@@ -61,6 +77,7 @@
   function hint(state) {
     const c = current(state);
     const number = c?.cardType === 'choice' ? 55 : c?.number;
+    if(c&&!canReveal(state,c.id))throw new Error('這張卡尚未公開。');
     if (!c || !['puzzle','choice'].includes(c.cardType) || !D.hintColumns.some(col => col.includes(number))) throw new Error('這張卡沒有提供原版提示。');
     const id = c.cardType === 'choice' ? 'ending-choice' : c.id;
     if (!state.hints.includes(id)) state.hints.push(id);
@@ -71,6 +88,7 @@
     return D.cards[id === 'flashlight' && !state.inventory.includes('batteries') ? item.unlitCardId : item.cardId];
   }
   function canView(state, id) {
+    if(!canReveal(state,id))return false;
     if (id === 'flashlight-lit') return state.inventory.includes('flashlight') && state.inventory.includes('batteries');
     if (id.startsWith('ending-') && id !== 'ending-cover') return state.phase === 'ending' && id === D.endings[state.ending].cardId;
     if (id === 'ending-cover' || id === 'game-over') return state.phase === 'ending';
@@ -129,5 +147,5 @@
     });
     return parsed;
   }
-  window.GameEngine = { SAVE_KEY, fresh, current, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
+  window.GameEngine = { SAVE_KEY, fresh, current, revealBlockers, canReveal, answerBlockers, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
 })();
