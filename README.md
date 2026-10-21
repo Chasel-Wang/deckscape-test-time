@@ -2,9 +2,15 @@
 
 依照 `口袋密室企畫書.md` 與使用者提供的卡牌素材製作的靜態 HTML 遊戲。目前使用 77 張圖片，其中 13 張改用對應檔名含 `_改` 的 PNG；77 張原始 JPG、13 張替換 PNG 及一張方向介面參考圖均保留原位。無須安裝 Node.js、套件或資料庫。
 
+## 部署狀態
+
+**已上線，使用 Vercel 託管。**
+
+[立即遊玩 Deckscape: Test Time](https://deckscape-test-time.vercel.app/)
+
 ## 開始遊玩
 
-1. 使用 Chrome 或 Edge 開啟專案根目錄的 `index.html`。
+1. 開啟 [線上遊戲](https://deckscape-test-time.vercel.app/)；也可使用 Chrome 或 Edge 在本機開啟專案根目錄的 `index.html`。
 2. 按「進入實驗室」即跳出規則視窗；捲動到規則底部並按「我已閱讀並了解規則」後，直接進入開場卡。
 3. 完成四道帷幕設置後開始計時，可自由切換四個牌堆。
 4. 已取得的物品、筆記及進度會自動保存於目前瀏覽器。
@@ -62,9 +68,11 @@ tests/tests.js            純邏輯與瀏覽器操作回歸測試
 
 ## GitHub／Vercel 部署
 
+目前已部署至 Vercel。以下保留部署設定，供後續更新或重新部署使用。
+
 將 `index.html`、`css/`、`js/` 及 `00-開場/` 至 `05-結局/` 的圖片一併提交 GitHub，保留原檔名與目錄。Vercel 匯入該儲存庫後，Root Directory 選含 `index.html` 的資料夾，Framework Preset 選 **Other**，Build Command 開啟 Override 並留空，Output Directory 使用 **`.`**。本專案沒有安裝、建置或環境變數需求；不需 SPA 重寫。設定依 [Vercel 官方靜態專案說明](https://vercel.com/docs/builds/configure-a-build#skip-build-step)。
 
-存檔仍在玩家瀏覽器的 localStorage；本機、Vercel 預覽網址及正式網域各自獨立，不會自動搬移或跨裝置同步。目前尚未實際部署至外部服務。
+存檔仍在玩家瀏覽器的 localStorage；本機、Vercel 預覽網址及正式網域各自獨立，不會自動搬移或跨裝置同步。若更換正式網域，新網址不會自動沿用舊網址的遊戲進度。
 
 ## 開發與測試
 
@@ -74,4 +82,4 @@ tests/tests.js            純邏輯與瀏覽器操作回歸測試
 
 `.work/` 只保存素材檢視縮圖、瀏覽器測試設定與截圖，不是遊戲運作的必要檔案。純前端會在原始碼中保存答案資料，只能避免正常操作中的劇透，無法阻擋自行閱讀原始碼。
 
-本專案可本機開啟或以靜態網站託管，目前未部署至外部服務。
+本專案已於 Vercel 上線，同時保留本機直接開啟 HTML 的遊玩方式。

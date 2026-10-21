@@ -44,4 +44,4 @@
 
 - 解答依使用者確認與既有原文，沒有外部補入或推測正式答案。未提供的實體解答背面及未指定的懲罰例外不視為已逐字核對。
 - 響應式與觸控事件在 Chrome 中測試，未實際操作 Safari、Firefox 或實體手機。
-- 目前維持純靜態 HTML／CSS／JS。已核對 Vercel 官方靜態專案設定，尚未實際部署 GitHub／Vercel，線上驗證未包含在本紀錄。
+- 正式網站為 [Deckscape: Test Time](https://deckscape-test-time.vercel.app/)。已唯讀確認首頁 HTTP 200、標題為「口袋密室 · 時間測試」且引用遊戲程式。上述 66 項測試在本機執行，未另於正式網站執行完整作答流程。
