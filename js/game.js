@@ -21,6 +21,19 @@
     return required.filter(item=>!state.inventory.includes(item));
   }
   function canReveal(state, id) { return !!D.cards[id] && revealBlockers(state,id).length===0; }
+  function needsSolution(state, id = current(state)?.id) {
+    const record=state.answers[id];
+    return !!(D.cards[id]?.backImage&&record&&record.status!=='pending'&&record.solutionRead!==true);
+  }
+  function canViewSolution(state, id) {
+    const record=state.answers[id];
+    return !!(D.cards[id]?.backImage&&record?.solutionRead===true&&record.status!=='pending'&&canView(state,id));
+  }
+  function readSolution(state) {
+    const c=current(state);
+    if(!c||!needsSolution(state,c.id))throw new Error('目前沒有待閱讀的解答卡面。');
+    state.answers[c.id].solutionRead=true;
+  }
   function answerBlockers(state, id=current(state)?.id) {
     return [...new Set([...revealBlockers(state,id),...(P.puzzles[id]?.answerRequires||[])])].filter(item=>!state.inventory.includes(item));
   }
@@ -39,6 +52,7 @@
     if (!c) throw new Error('這組牌堆已探索完畢。');
     if (!canReveal(state,c.id)) throw new Error(ITEM_LOCK_MESSAGE);
     if (c.cardType === 'puzzle' && (!state.answers[c.id] || state.answers[c.id].status === 'pending')) throw new Error('請先完成作答與核對。');
+    if (needsSolution(state,c.id)) throw new Error('請先閱讀解答卡面，再繼續。');
     if (c.cardType === 'choice') throw new Error('請先選擇要留下的物品。');
     if (c.itemId && !state.inventory.includes(c.itemId)) state.inventory.push(c.itemId);
     if (state.phase === 'intro') {
@@ -65,7 +79,7 @@
     const correct = P.check(c.id, answer);
     state.answers[c.id] = { answer: String(answer).trim().slice(0, 1200), at: now, correct,
       status: correct === null ? 'pending' : 'verified', mode: correct === null ? 'manual' : 'automatic', missing,
-      penalty: missing.length ? 2 : correct === false ? 1 : 0 };
+      penalty: missing.length ? 2 : correct === false ? 1 : 0, ...(c.backImage?{solutionRead:false}:{}) };
     return state.answers[c.id];
   }
   function adjudicate(state, verdict, missingItem = false) {
@@ -129,7 +143,7 @@
     if (!value.answers || typeof value.answers !== 'object' || Array.isArray(value.answers)) return false;
     return Object.entries(value.answers).every(([id,r]) => P.puzzles[id] && r && typeof r.answer === 'string' && r.answer.length <= 1200 &&
       ['pending','verified','unverified'].includes(r.status) && [true,false,null].includes(r.correct) && [0,1,2].includes(r.penalty) &&
-      Array.isArray(r.missing) && r.missing.every(item => D.items[item]));
+      Array.isArray(r.missing) && r.missing.every(item => D.items[item]) && (r.solutionRead===undefined||typeof r.solutionRead==='boolean'));
   }
   function save(state, storage = localStorage) { storage.setItem(SAVE_KEY, JSON.stringify(state)); }
   function load(storage = localStorage) {
@@ -149,5 +163,5 @@
     });
     return parsed;
   }
-  window.GameEngine = { SAVE_KEY, ITEM_LOCK_MESSAGE, fresh, current, revealBlockers, canReveal, answerBlockers, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
+  window.GameEngine = { SAVE_KEY, ITEM_LOCK_MESSAGE, fresh, current, revealBlockers, canReveal, needsSolution, canViewSolution, readSolution, answerBlockers, selectDeck, advance, submit, adjudicate, hint, itemCard, canView, finish, stats, valid, save, load, clone };
 })();

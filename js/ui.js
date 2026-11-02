@@ -87,7 +87,7 @@
       <div class="metrics"><div class="metric timer"><span>${intro ? '等待開始' : '探索時間'}</span><strong id="timer">${time(stats.elapsed)}</strong></div><div class="metric"><span>錯誤 X</span><strong>${stats.errors}</strong></div><div class="metric"><span>已用提示</span><strong>${stats.hints}</strong></div></div></div>
       ${saveIssue ? `<div class="notice warning">${esc(saveIssue)}</div>` : ''}<div class="game-layout"><aside class="left-sidebar">
       <h2 class="side-heading">${intro ? 'PROLOGUE / 序章' : 'EXPLORE / 探索'}</h2>${intro ? `<div class="intro-progress">先了解遊戲與操作方式，再一同揭開帷幕。<div class="intro-dots">${D.intro.map((id,i)=>`<i class="${i<=state.introIndex?'done':''}"></i>`).join('')}</div>第 ${state.introIndex+1} / ${D.intro.length} 張開場卡<br>正式探索才開始計時。</div>` : `<div class="deck-list">${Object.values(D.decks).map(deck=>`<button class="deck-button ${state.activeDeck===deck.id?'active':''}" data-action="deck" data-deck="${deck.id}" style="--deck-color:${deck.color}" aria-pressed="${state.activeDeck===deck.id}"><span class="deck-number">CHAPTER ${deck.label}</span><span class="deck-name">${deck.name}</span><small>${state.deckPositions[deck.id]===deck.cards.length?'探索完畢':`進度 ${state.deckPositions[deck.id]} / ${deck.cards.length}`}</small><div class="deck-progress"><span style="width:${100*state.deckPositions[deck.id]/deck.cards.length}%"></span></div></button>`).join('')}</div>`}
-      <div class="side-tools">${state.visited.includes('lab') ? '<button data-action="view" data-card="lab">◈　實驗室全景</button>' : ''}<button data-action="history">▤　已讀卡牌</button><button data-action="log">↳　作答紀錄</button><button data-action="home">⌂　回到首頁</button></div><p class="help-note">${intro ? '物品會隨著探索加入右側。' : '切換牌堆或回到首頁，計時會持續。'}<br>每次操作自動保存。</p></aside>
+      <div class="side-tools">${state.visited.includes('lab') ? '<button data-action="view" data-card="lab">◈　實驗室全景</button>' : ''}<button data-action="history">▤　已讀卡牌</button><button data-action="solution-history">▧　已讀解答</button><button data-action="log">↳　作答紀錄</button><button data-action="home">⌂　回到首頁</button></div><p class="help-note">${intro ? '物品會隨著探索加入右側。' : '切換牌堆或回到首頁，計時會持續。'}<br>每次操作自動保存。</p></aside>
       <div class="center-column">${c ? `<div class="card-table"><div class="card-topline"><span>${intro?'PROLOGUE':d.name}</span><span>NO. ${String(c.number).padStart(2,'0')} · ${c.cardType==='puzzle'?'謎題':c.cardType==='item'?'物品':'故事'}</span></div><div class="card-holder">${revealed?`<img class="game-card" src="${asset(c.frontImage)}" alt="${esc(c.title)}，卡號 ${c.number}" data-action="view" data-card="${c.id}" tabindex="0" role="button" aria-label="放大${esc(c.title)}">`:'<div class="locked-card"><span aria-hidden="true">◇</span>卡牌尚未公開</div>'}</div>${revealed?`<div class="card-controls"><button data-action="view" data-card="${c.id}">＋ 放大 / 旋轉</button>${state.inventory.length ? '<button data-action="compare">⇄ 物品比對</button>' : ''}${(c.cardType==='choice' || c.cardType==='puzzle' && D.hintColumns.some(col=>col.includes(c.number))) ? '<button data-action="hint">原版提示 ↗</button>' : ''}</div>`:''}</div>${interaction(c)}` : `<div class="card-table complete-deck"><strong>✓</strong><h2>這道帷幕已探索完畢</h2><p>帶著找到的物品，繼續探索其他牌堆。</p></div>`}</div>
       <aside class="right-sidebar"><section class="inventory hint-area" aria-labelledby="hint-area-title"><div class="inventory-header"><h2 id="hint-area-title">提示區</h2><span>隨時可查看</span></div><div class="hint-card-grid">${D.hintCards.map((hint,i)=>`<button class="item-button" data-action="hint-card" data-card="${hint.id}" aria-label="查看${hint.title}"><span class="hint-card-preview" style="background-image:url('${asset(hint.frontImage)}');background-position:${i===0?'left':'right'} center" aria-hidden="true"></span><span>${hint.number} 號提示卡</span></button>`).join('')}</div></section><section class="inventory"><div class="inventory-header"><h2>隨身物品</h2><span>${String(state.inventory.length).padStart(2,'0')} ITEMS</span></div>${state.inventory.length ? `<div class="inventory-grid">${state.inventory.map(id=>{const item=D.items[id],ic=E.itemCard(state,id);return `<button class="item-button" data-action="item" data-item="${id}"><img src="${asset(ic.frontImage)}" alt=""><span>${esc(item.name)}${id==='flashlight'&&!state.inventory.includes('batteries')?' · 未通電':''}</span></button>`;}).join('')}</div>` : '<div class="empty-inventory"><b>◇</b>等待你的第一個發現<br>取得的物品會保留在這裡</div>'}</section><div class="notebook"><label for="notes">探索筆記 <small>自動保存</small></label><textarea id="notes" maxlength="10000" placeholder="記下數字、線索，或還沒想通的地方……">${esc(state.notes)}</textarea></div><p class="help-note">每題只有一次作答機會。<br>還沒準備好時，可以先探索其他牌堆。</p></aside></div></section>`;
   }
@@ -133,12 +133,14 @@
       if (!record) return `<section class="interaction"><form id="answer-form"><h2>你的解答</h2>${p.prompt?`<label class="input-label" for="${p.inputType==='item-orientation'?'answer-item':p.inputType==='coordinate-select'?'answer-column':'answer'}">${esc(p.prompt)}</label>`:''}${answerFields(p)}<div class="answer-row"><button class="button" type="submit">確認作答 <span>→</span></button><small>每題只可送出一次</small></div></form></section>`;
       if (record.status === 'pending') return `<section class="interaction"><span class="result-tag pending">答案已鎖定 · 等待核對</span><div class="recorded-answer">${esc(record.answer)}</div><p>本題的原版解答背面尚未提供。請對照實體解答，再記錄結果；若沒有解答，請保留為「待核對」。</p><label class="check-label"><input type="checkbox" id="missing-item">核對後確認：作答時缺少必需物品（記錄 2 個 X）</label><div class="manual-actions">${button('已核對，正確', 'adjudicate', false, 'data-verdict="correct"')}${button('已核對，錯誤', 'adjudicate', true, 'data-verdict="incorrect"')}${button('保留待核對，繼續', 'adjudicate', true, 'data-verdict="unverified"')}</div>${record.missing.length ? '<p>依卡牌已確認缺少必需物品，本題記錄 2 個 X。</p>' : ''}</section>`;
       const label = record.status==='unverified' ? '待核對 · 成績暫定' : record.correct ? '已核對 · 解答正確' : '已核對 · 解答有誤';
-      return `<section class="interaction"><span class="result-tag ${record.status==='unverified'?'pending':!record.correct?'wrong':''}">${label}</span><div class="recorded-answer">${esc(answerLabel(c.id,record.answer))}</div>${p.explanation ? `<p>${esc(p.explanation)}</p>` : ''}${record.penalty ? `<p>本題記錄 ${record.penalty} 個 X${record.penalty===2?'（缺少必需物品）':''}。仍依卡牌指示繼續。</p>` : ''}<div class="answer-row">${button('依指示繼續 <span>→</span>', 'advance')}${c.backImage ? button('查看解答背面', 'solution', true) : ''}</div></section>`;
+      return `<section class="interaction"><span class="result-tag ${record.status==='unverified'?'pending':!record.correct?'wrong':''}">${label}</span><div class="recorded-answer">${esc(answerLabel(c.id,record.answer))}</div>${p.explanation ? `<p>${esc(p.explanation)}</p>` : ''}${record.penalty ? `<p>本題記錄 ${record.penalty} 個 X${record.penalty===2?'（缺少必需物品）':''}。仍依卡牌指示繼續。</p>` : ''}<div class="answer-row">${E.needsSolution(state,c.id)?button('閱讀解答卡面 <span>→</span>','solution'):button('依指示繼續 <span>→</span>', 'advance')}${c.backImage&&!E.needsSolution(state,c.id) ? button('查看解答背面', 'solution', true) : ''}</div></section>`;
     }
     if (c.cardType === 'choice') return `<section class="interaction"><h2>你想留下什麼？</h2><p>選擇一件隨身物品，留給過去的博士。確認後即決定這場測試的結局。</p><form id="ending-form"><div class="ending-choice">${state.inventory.map(id=>`<label><input type="radio" name="leftItem" value="${id}" required> ${esc(D.items[id].name)}</label>`).join('')}</div><button type="submit" class="button">做出最後的選擇 <span>→</span></button></form></section>`;
-    let label = c.cardType==='item' ? '收好物品，繼續' : '依指示繼續';
+    let label = c.cardType==='item' ? '收好物品，繼續' : '我已閱讀，繼續';
     if (c.id === 'curtain-b') label = '揭開四道帷幕，開始計時';
-    return `<section class="interaction"><h2>${esc(c.title)}</h2>${c.id==='blue-003'&&!state.inventory.includes('batteries')?`<p>${E.ITEM_LOCK_MESSAGE}</p>`:''}${button(label + ' <span>→</span>', 'advance')}</section>`;
+    const sequence=state.phase==='intro'?D.intro:D.decks[state.activeDeck].cards,previous=D.cards[sequence[sequence.indexOf(c.id)-1]],record=previous&&state.answers[previous.id];
+    const result=record?`<span class="result-tag ${record.correct?'':'wrong'}">上一題 · ${record.correct?'解答正確':'解答有誤'}${record.penalty?` · ${record.penalty} 個 X`:''}</span><div class="recorded-answer">${esc(answerLabel(previous.id,record.answer))}</div>`:'';
+    return `<section class="interaction">${result}<h2>${esc(c.title)}</h2>${c.id==='blue-003'&&!state.inventory.includes('batteries')?`<p>${E.ITEM_LOCK_MESSAGE}</p>`:''}${button(label + ' <span>→</span>', 'advance')}</section>`;
   }
   function summary() {
     const s = E.stats(state), ending = D.endings[state.ending], c = D.cards[ending.cardId];
@@ -148,16 +150,25 @@
     if (!state || !E.canView(state,id)) throw new Error(state&&E.revealBlockers(state,id).length?E.ITEM_LOCK_MESSAGE:'這張卡牌尚未解鎖。');
     viewer(D.cards[id]);
   }
-  function viewer(c) {
+  function showSolution() {
+    const c=E.current(state),record=c&&state.answers[c.id];
+    if(!c?.backImage||!record||record.status==='pending')return;
+    viewer({...c,title:`第 ${c.number} 號 · 解答卡面`,frontImage:c.backImage},E.needsSolution(state,c.id)?c.id:null);
+  }
+  function viewer(c, solutionId = null) {
     const media=c.crop ? `<canvas id="viewer-image" role="img" aria-label="${esc(c.title)}" data-rotation="0"></canvas>` : `<img id="viewer-image" src="${asset(c.frontImage)}" alt="${esc(c.title)}" data-rotation="0">`;
-    showModal(c.title, `<div class="viewer-tools"><button data-action="rotate" data-angle="-90">↶ 左轉</button><button data-action="rotate" data-angle="90">↷ 右轉</button><button data-action="zoom">＋ 原尺寸 / 縮小</button><button data-action="view-reset">重設</button></div><div class="viewer-viewport" id="viewer"><div id="viewer-stage">${media}</div></div>`,true);
+    showModal(c.title, `<div class="viewer-tools"><button data-action="rotate" data-angle="-90">↶ 左轉</button><button data-action="rotate" data-angle="90">↷ 右轉</button><button data-action="zoom">＋ 原尺寸 / 縮小</button><button data-action="view-reset">重設</button></div><div class="viewer-viewport" id="viewer"><div id="viewer-stage">${media}</div></div>${solutionId?`<div class="modal-actions">${button('我已閱讀，繼續','solution-read',false,`data-card="${solutionId}" disabled`)}</div>`:''}`,true);
     const img=document.getElementById('viewer-image');
     if(c.crop){
       const source=new Image();
       source.onload=()=>{if(!img.isConnected)return;const [x,y,w,h]=c.crop;img.width=Math.round(source.naturalWidth*w);img.height=Math.round(source.naturalHeight*h);img.getContext('2d').drawImage(source,source.naturalWidth*x,source.naturalHeight*y,source.naturalWidth*w,source.naturalHeight*h,0,0,img.width,img.height);updateViewer();};
       source.onerror=()=>toast('提示卡圖片無法載入，請確認原始素材仍在資料夾中。');
       source.src=asset(c.frontImage);
-    }else{img.onload=updateViewer;if(img.complete)updateViewer();}
+    }else{
+      const loaded=()=>{if(!img.isConnected)return;updateViewer();if(solutionId&&img.naturalWidth>0){const accept=modalContent.querySelector('[data-action="solution-read"]');if(accept?.dataset.card===solutionId)accept.disabled=false;}};
+      if(solutionId)img.dataset.solutionCard=solutionId;
+      img.onload=loaded;img.onerror=()=>toast('卡面圖片無法載入，請確認圖片檔案仍在資料夾中。');if(img.complete)loaded();
+    }
   }
   function updateViewer() {
     const img=document.getElementById('viewer-image'),stage=document.getElementById('viewer-stage'),viewport=document.getElementById('viewer');
@@ -285,6 +296,14 @@
     const cards=state.visited.map(id=>D.cards[id]).filter(c=>c && E.canView(state,c.id));
     showModal('已讀卡牌',`<p>只保留已解鎖的卡牌；尚未到達的內容不會出現。</p><div class="history-grid">${cards.map(c=>`<button data-action="view" data-card="${c.id}"><img src="${asset(c.frontImage)}" alt="" loading="lazy">${esc(c.title)}</button>`).join('')}</div>`,true);
   }
+  function solutionHistory() {
+    const cards=Object.keys(state.answers).filter(id=>E.canViewSolution(state,id)).map(id=>D.cards[id]).sort((a,b)=>a.number-b.number);
+    showModal('已讀解答',cards.length?`<div class="history-grid">${cards.map(c=>`<button data-action="read-solution-view" data-card="${c.id}"><img src="${asset(c.backImage)}" alt="" loading="lazy">第 ${c.number} 號 · ${esc(c.title)}</button>`).join('')}</div>`:'<p class="muted">還沒有已讀解答。完成作答並確認閱讀後，就會顯示在這裡。</p>',true);
+  }
+  function viewReadSolution(id) {
+    if(!E.canViewSolution(state,id))throw new Error('這張解答尚未閱讀。');
+    const c=D.cards[id];viewer({...c,title:`第 ${c.number} 號 · 解答卡面`,frontImage:c.backImage});
+  }
   function catalog() {
     if (!dev) return;
     showModal('開發素材檢視 · 包含劇透',`<div class="notice warning">這個清單只在網址帶有 ?dev=1 時開啟。正式遊玩請移除網址參數。</div><div class="history-grid">${Object.values(D.cards).map(c=>`<button data-action="dev-view" data-card="${c.id}"><img src="${asset(c.frontImage)}" alt="" loading="lazy">${esc(c.title)} (${c.id})</button>`).join('')}</div>`,true);
@@ -300,12 +319,21 @@
       case 'close':closeModal();break;
       case 'deck':E.selectDeck(state,target.dataset.deck);persist();render();break;
       case 'advance':E.advance(state);persist();render();break;
-      case 'confirm-answer':{const answer=target.dataset.answer;E.submit(state,answer);closeModal();persist();render();break;}
+      case 'confirm-answer':{
+        const c=E.current(state),record=E.submit(state,target.dataset.answer);closeModal();persist();
+        if(record.status!=='pending'&&!c.backImage){E.advance(state);persist();toast(`${record.correct?'解答正確':'解答有誤'}${record.penalty?`，記錄 ${record.penalty} 個 X`:''}。請閱讀接下來的卡面。`);}
+        render();if(E.needsSolution(state,c.id))showSolution();break;
+      }
       case 'adjudicate':E.adjudicate(state,target.dataset.verdict,document.getElementById('missing-item')?.checked);persist();render();break;
       case 'sequence-add':case 'sequence-undo':case 'sequence-clear':updateSequence(action,target.dataset.letter);break;
       case 'view':view(target.dataset.card);break;
       case 'item':viewer(E.itemCard(state,target.dataset.item));break;
-      case 'solution':{const c=E.current(state);if(c.backImage&&state.answers[c.id]&&state.answers[c.id].status!=='pending')viewer({...c,title:'解決方案',frontImage:c.backImage});break;}
+      case 'solution':showSolution();break;
+      case 'solution-read':{
+        const img=document.getElementById('viewer-image');
+        if(!modal.open||target.disabled||target.dataset.card!==E.current(state)?.id||img?.dataset.solutionCard!==target.dataset.card||!img.complete||!img.naturalWidth)break;
+        E.readSolution(state);E.advance(state);persist();closeModal();render();break;
+      }
       case 'rotate':{const img=document.getElementById('viewer-image');img.dataset.rotation=Number(img.dataset.rotation)+Number(target.dataset.angle);updateViewer();break;}
       case 'zoom':document.getElementById('viewer').classList.toggle('zoomed');updateViewer();break;
       case 'view-reset':{const img=document.getElementById('viewer-image');img.dataset.rotation='0';document.getElementById('viewer').classList.remove('zoomed');updateViewer();break;}
@@ -318,6 +346,8 @@
       case 'compare-front':if(comparison){comparison.layers[comparison.selected].z=2;comparison.layers[comparison.selected==='a'?'b':'a'].z=1;updateCompare();}break;
       case 'compare-reset':arrangeCompare('side',true);break;
       case 'history':history();break;
+      case 'solution-history':solutionHistory();break;
+      case 'read-solution-view':viewReadSolution(target.dataset.card);break;
       case 'log':log();break;
       case 'review':review(target.dataset.card);break;
       case 'review-result':{const r=state.answers[target.dataset.card];if(r?.status!=='unverified')break;r.correct=target.dataset.correct==='true';r.status='verified';r.declaredMissing=!!document.getElementById('review-missing')?.checked;r.penalty=r.missing.length||r.declaredMissing?2:r.correct?0:1;persist();closeModal();render();toast('已更新核對結果與成績。');break;}
@@ -369,6 +399,6 @@
   window.addEventListener('resize',updateViewer);
   window.addEventListener('storage',event=>{if(event.key!==E.SAVE_KEY||testing)return;try{state=E.load(storage);closeModal();render();toast('已同步另一個分頁的遊戲進度。');}catch(error){toast(error.message);}});
   setInterval(()=>{if(!state)return;const timer=document.getElementById('timer');if(timer)timer.textContent=time(E.stats(state).elapsed);},1000);
-  if(testing)window.GameTest={getState:()=>E.clone(state),setState:value=>{if(!E.valid(value))throw new Error('Invalid fixture');state=E.clone(value);onHome=false;render();},save:()=>persist(),reload:()=>{state=E.load(storage);onHome=false;render();},render};
+  if(testing)window.GameTest={getState:()=>E.clone(state),setState:value=>{if(!E.valid(value))throw new Error('Invalid fixture');closeModal();state=E.clone(value);onHome=false;render();},save:()=>persist(),reload:()=>{state=E.load(storage);closeModal();onHome=false;render();},render};
   render();
 })();

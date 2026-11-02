@@ -9,23 +9,67 @@
   function solve(state,manual='correct'){
     const c=E.current(state),p=P.puzzles[c.id]; E.submit(state,p.answers?.[0]||'測試作答',2000);
     if(state.answers[c.id].status==='pending')E.adjudicate(state,manual);
+    if(E.needsSolution(state,c.id))E.readSolution(state);
   }
   function playing(){const s=E.fresh(1000);while(s.phase==='intro'){if(E.current(s).cardType==='puzzle')solve(s);E.advance(s,2000);}return s;}
   function atPuzzle(id,unlocked=true){const s=playing();const c=D.cards[id];s.activeDeck=c.deck;s.deckPositions[c.deck]=D.decks[c.deck].cards.indexOf(id);s.visited.push(id);if(unlocked)s.inventory.push(...E.answerBlockers(s,id));return s;}
+  async function readSolutionUI(doc){
+    const img=doc.getElementById('viewer-image');assert(img,'Solution must be open');
+    if(!img.complete)await new Promise((resolve,reject)=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',()=>reject(new Error('Solution image failed')),{once:true});});
+    assert(img.naturalWidth>0);const accept=doc.querySelector('[data-action="solution-read"]');assert(accept&&!accept.disabled);accept.click();
+  }
   test('所有卡牌 ID 唯一，牌堆與謎題資料可相互對應',()=>{
     const ids=Object.values(D.decks).flatMap(d=>d.cards);assert(new Set(ids).size===ids.length);
     ids.forEach(id=>assert(D.cards[id]));Object.keys(P.puzzles).forEach(id=>assert(D.cards[id]?.puzzleId===id));
     assert(Object.keys(P.puzzles).length===26);assert(Object.values(P.puzzles).filter(p=>p.answers).length===26);
   });
   test('所有 14 件物品都且只對應一個結局',()=>{Object.keys(D.items).forEach(id=>assert(Object.values(D.endings).filter(e=>e.items.includes(id)).length===1));assert(Object.keys(D.items).length===14);});
+  test('新增 25 題不論正誤均須讀解答，存讀檔保留作答與評分',()=>{
+    const images=new Set();
+    for(const id of Object.keys(P.puzzles).filter(id=>id!=='p6')){
+      assert(D.cards[id].backImage?.startsWith('口袋密室解答/'),id);images.add(D.cards[id].backImage);
+      for(const correct of [true,false]){
+        const s=atPuzzle(id);s.inventory=Object.keys(D.items);const p=P.puzzles[id];
+        const answer=correct?p.answers[0]:p.inputType==='inventory'?'score':p.inputType==='item-orientation'?'electronic:0':'wrong';E.submit(s,answer);
+        assert(s.answers[id].correct===correct,id);const before=JSON.stringify(s);throws(()=>E.advance(s));assert(JSON.stringify(s)===before);
+        const loaded=E.load({getItem:()=>before});assert(E.needsSolution(loaded));const record=JSON.stringify(loaded.answers[id]);E.readSolution(loaded);
+        assert(JSON.stringify({...loaded.answers[id],solutionRead:false})===record);const restored=E.load({getItem:()=>JSON.stringify(loaded)});assert(!E.needsSolution(restored));
+        E.advance(restored);assert(E.current(restored)?.id!==id);
+      }
+    }
+    assert(images.size===25);
+  });
+  test('新增解答相容舊存檔，僅要求目前題目閱讀，不回退既有進度',()=>{
+    for(const id of ['p14','p17','p28','p46','p48']){
+      const s=atPuzzle(id);s.inventory=Object.keys(D.items);E.submit(s,P.puzzles[id].answers[0]);delete s.answers[id].solutionRead;
+      const loaded=E.load({getItem:()=>JSON.stringify(s)});assert(E.needsSolution(loaded));throws(()=>E.advance(loaded));assert(JSON.stringify(loaded)===JSON.stringify(s));
+      const other=D.cards[id].deck==='blue'?'yellow':'blue';E.selectDeck(loaded,other);throws(()=>E.readSolution(loaded));E.selectDeck(loaded,D.cards[id].deck);assert(E.needsSolution(loaded));
+      E.readSolution(loaded);E.advance(loaded);delete loaded.answers[id].solutionRead;
+      const restored=E.load({getItem:()=>JSON.stringify(loaded)});assert(JSON.stringify(restored.deckPositions)===JSON.stringify(loaded.deckPositions));assert(!E.needsSolution(restored));
+    }
+  });
   test('初始只解鎖第一張開場卡',()=>{const s=E.fresh();assert(E.canView(s,'intro-3'));assert(!E.canView(s,'p12'));assert(!E.canView(s,'ending-D'));});
   test('開場不能切換牌堆或提前結局',()=>{const s=E.fresh();throws(()=>E.selectDeck(s,'blue'));throws(()=>E.finish(s,'score'));});
   test('教學正確作答與解答背面',()=>{const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);E.submit(s,'紫色');assert(s.answers.p6.correct===true);assert(E.current(s).backImage);});
-  test('教學答錯只記一次 X 並可以繼續',()=>{const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);E.submit(s,'red');assert(E.stats(s).errors===1);throws(()=>E.submit(s,'purple'));E.advance(s);assert(E.current(s).id==='light');});
+  test('教學答錯只記一次 X，讀完解答才能繼續',()=>{const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);E.submit(s,'red');assert(E.stats(s).errors===1);throws(()=>E.submit(s,'purple'));throws(()=>E.advance(s));E.readSolution(s);E.advance(s);assert(E.current(s).id==='light');});
+  test('解答背面不分對錯都必讀，閱讀狀態保存且不改變評分',()=>{
+    for(const answer of ['purple','red']){
+      const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);throws(()=>E.readSolution(s));E.submit(s,answer);
+      const before=JSON.stringify(s);throws(()=>E.advance(s));assert(JSON.stringify(s)===before);assert(E.needsSolution(s));
+      const loaded=E.load({getItem:()=>before});assert(E.needsSolution(loaded));const errors=E.stats(loaded).errors;E.readSolution(loaded);assert(E.stats(loaded).errors===errors);assert(!E.needsSolution(loaded));
+      const restored=E.load({getItem:()=>JSON.stringify(loaded)});assert(!E.needsSolution(restored));E.advance(restored);assert(E.current(restored).id==='light');
+    }
+  });
+  test('停在教學的舊存檔仍須讀解答，既有進度不回退',()=>{
+    const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);E.submit(s,'purple');delete s.answers.p6.solutionRead;
+    const loaded=E.load({getItem:()=>JSON.stringify(s)});assert(E.needsSolution(loaded));throws(()=>E.advance(loaded));E.readSolution(loaded);E.advance(loaded);
+    const progress=loaded.introIndex;delete loaded.answers.p6.solutionRead;const restored=E.load({getItem:()=>JSON.stringify(loaded)});assert(restored.introIndex===progress&&E.current(restored).id==='light');
+    restored.answers.p6.solutionRead='yes';assert(!E.valid(restored));
+  });
   test('未作答無法翻越謎題',()=>{const s=atPuzzle('p14');throws(()=>E.advance(s));throws(()=>E.submit(s,'  '));});
   test('藍色帷幕完成設置才開始計時',()=>{const s=E.fresh(10);assert(E.stats(s,10000).elapsed===0);const p=playing();assert(p.startedAt===2000);assert(E.stats(p,62000).elapsed===60000);});
   test('全形字與英文大小寫正規化',()=>{assert(P.check('p24',' Ｅｉｎｓｔｅｉｎ ')===true);assert(P.check('p12','Ｘ')===true);assert(P.check('p12','*')===true);assert(P.check('p12','＊')===true);assert(P.check('p12','+')===false);});
-  test('14 號以 6 自動判定並推進到新版 15 號圖片',()=>{const s=atPuzzle('p14');E.submit(s,'6');assert(s.answers.p14.correct&&s.answers.p14.status==='verified');assert(E.stats(s).errors===0);E.advance(s);assert(E.current(s).id==='p15');assert(E.current(s).frontImage.endsWith('005-箭頭方向-題目3_改.png'));const wrong=atPuzzle('p14');E.submit(wrong,'4');assert(wrong.answers.p14.correct===false&&E.stats(wrong).errors===1);});
+  test('14 號以 6 自動判定，讀完解答才推進到新版 15 號圖片',()=>{const s=atPuzzle('p14');E.submit(s,'6');assert(s.answers.p14.correct&&s.answers.p14.status==='verified');assert(E.stats(s).errors===0);throws(()=>E.advance(s));E.readSolution(s);E.advance(s);assert(E.current(s).id==='p15');assert(E.current(s).frontImage.endsWith('005-箭頭方向-題目3_改.png'));const wrong=atPuzzle('p14');E.submit(wrong,'4');assert(wrong.answers.p14.correct===false&&E.stats(wrong).errors===1);});
   test('15、34 號座標忽略標點、空白與全半形，錯誤或多個座標仍計一次錯誤',()=>{
     const cases=[['p15',['C3','3C','c3','3c','Ｃ３','C,3','C.3','C3.','C3。','C/3','C-3','C：3','(C3)','「C3」','C_3','C 3','3 C','Ｃ，３。','（３　ｃ）','C＋3'],['C4','3B','C3/D2','C3C3','3C4','---']],['p34',['2D','D2','d2','２Ｄ','D,2','2 D','Ｄ，２。','（２　ｄ）','D/2','2＋D'],['D3','2C','D2/C3','D2D2','2D3','---']]];
     for(const [id,correct,incorrect] of cases){
@@ -50,7 +94,7 @@
     for(const [id,answers] of Object.entries(cases))for(const answer of answers){const s=atPuzzle(id);s.inventory=[...new Set([...s.inventory,...P.puzzles[id].required])];E.submit(s,answer);assert(s.answers[id].correct&&s.answers[id].mode==='automatic',id+': '+answer);assert(E.stats(s).errors===0);}
     assert(!P.check('p48','LHFH'));assert(!P.check('p48','LHHFK'));assert(!P.check('p50','B3'));assert(!P.check('p50','B2 C3'));
   });
-  test('自動判錯只記一次並鎖定答案，可依指示繼續',()=>{const s=atPuzzle('p17');E.submit(s,'test');assert(s.answers.p17.correct===false&&E.stats(s).errors===1);throws(()=>E.adjudicate(s,'correct'));throws(()=>E.submit(s,'237'));E.advance(s);assert(E.current(s).id==='yellow-009');});
+  test('自動判錯只記一次並鎖定答案，讀完解答可繼續',()=>{const s=atPuzzle('p17');E.submit(s,'test');assert(s.answers.p17.correct===false&&E.stats(s).errors===1);throws(()=>E.adjudicate(s,'correct'));throws(()=>E.submit(s,'237'));throws(()=>E.advance(s));E.readSolution(s);E.advance(s);assert(E.current(s).id==='yellow-009');});
   test('17、20、23、24、34、48 缺關鍵物品時禁止作答，不扣分、不留下答案',()=>{
     for(const [id,item] of [['p17','card777'],['p20','circuit'],['p23','keys'],['p24','cipher'],['p34','note'],['p48','disc']]){const s=atPuzzle(id,false),before=JSON.stringify(s);assert(E.canReveal(s,id));throws(()=>E.submit(s,P.puzzles[id].answers[0]));assert(JSON.stringify(s)===before);throws(()=>E.advance(s));s.inventory.push(item);E.submit(s,P.puzzles[id].answers[0]);assert(s.answers[id].correct&&E.stats(s).errors===0);}
   });
@@ -143,11 +187,86 @@
     doc.querySelector('input[value="purple"]').checked=true;doc.getElementById('answer-form').requestSubmit();assert(doc.getElementById('modal').open);doc.querySelector('#modal [data-action="close"]').click();assert(!win.GameTest.getState().answers.p6);
     doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p6.correct);assert(!doc.querySelector('#answer-form'));
   });
+  await testAsync('UI 教學對錯皆自動顯示解答，關閉或重載不能略過閱讀',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const answer of ['purple','red']){
+      const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);win.GameTest.setState(s);
+      doc.querySelector(`input[value="${answer}"]`).checked=true;doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();
+      assert(doc.getElementById('modal').open);assert(doc.getElementById('viewer-image').src.includes(encodeURIComponent('008-題目1提示.jpg')));
+      assert(!doc.querySelector('.interaction [data-action="advance"]'));doc.getElementById('modal-close').click();assert(E.current(win.GameTest.getState()).id==='p6');
+      win.GameTest.reload();assert(E.current(win.GameTest.getState()).id==='p6'&&E.needsSolution(win.GameTest.getState()));doc.querySelector('[data-action="solution"]').click();
+      const img=doc.getElementById('viewer-image');if(!img.complete)await new Promise((resolve,reject)=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',()=>reject(new Error('Solution image failed')),{once:true});});
+      assert(img.naturalWidth>0);assert(!doc.querySelector('[data-action="solution-read"]').disabled);
+      doc.querySelector('[data-action="rotate"]').click();doc.querySelector('[data-action="zoom"]').click();doc.querySelector('[data-action="view-reset"]').click();
+      doc.querySelector('[data-action="solution-read"]').click();assert(!doc.getElementById('modal').open);assert(E.current(win.GameTest.getState()).id==='light');
+      assert(win.GameTest.getState().answers.p6.solutionRead);assert(E.stats(win.GameTest.getState()).errors===(answer==='purple'?0:1));
+      win.GameTest.reload();assert(E.current(win.GameTest.getState()).id==='light');
+    }
+  });
+  await testAsync('解答圖片載入失敗時不能確認或推進，可重開重試',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument,c=win.DeckData.cards.p6,original=c.backImage;
+    try{
+      c.backImage='00-開場/missing-solution.jpg';const s=E.fresh();while(E.current(s).id!=='p6')E.advance(s);win.GameTest.setState(s);
+      doc.querySelector('input[value="purple"]').checked=true;doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();
+      const img=doc.getElementById('viewer-image');if(!img.complete)await new Promise(resolve=>img.addEventListener('error',resolve,{once:true}));
+      assert(!img.naturalWidth&&doc.querySelector('[data-action="solution-read"]').disabled);assert(E.needsSolution(win.GameTest.getState()));
+      doc.getElementById('modal-close').click();assert(E.current(win.GameTest.getState()).id==='p6');
+    }finally{c.backImage=original;}
+    doc.querySelector('[data-action="solution"]').click();assert(doc.getElementById('viewer-image').src.includes(encodeURIComponent('008-題目1提示.jpg')));doc.getElementById('modal-close').click();
+  });
+  await testAsync('一般題目對錯皆先讀解答再顯示故事，不跳過物品卡',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const answer of ['237','999']){
+      win.GameTest.setState(atPuzzle('p17'));doc.getElementById('answer').value=answer;doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();
+      assert(E.current(win.GameTest.getState()).id==='p17');assert(doc.getElementById('modal').open);await readSolutionUI(doc);
+      assert(E.current(win.GameTest.getState()).id==='yellow-009');assert(doc.querySelector('.game-card').src.includes(encodeURIComponent('009-008通關.jpg')));assert(!win.GameTest.getState().inventory.includes('electrode'));
+      assert(doc.querySelector('[data-action="advance"]').textContent.includes('我已閱讀'));assert(win.GameTest.getState().answers.p17.correct===(answer==='237'));
+      win.GameTest.reload();assert(E.current(win.GameTest.getState()).id==='yellow-009');doc.querySelector('[data-action="advance"]').click();assert(E.current(win.GameTest.getState()).id==='yellow-010');
+    }
+  });
+  await testAsync('全部 26 題對錯都自動開啟對應解答，確認後才前進一張',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    for(const id of Object.keys(P.puzzles))for(const correct of [true,false]){
+      const p=P.puzzles[id],c=D.cards[id];let s;
+      if(id==='p6'){s=E.fresh();while(E.current(s).id!==id)E.advance(s);}else s=atPuzzle(id);
+      s.inventory=Object.keys(D.items);const index=s.phase==='intro'?s.introIndex:s.deckPositions[c.deck];win.GameTest.setState(s);
+      const solutionPath=c.backImage.split('/').map(encodeURIComponent).join('/');assert(!doc.getElementById('app').innerHTML.includes(solutionPath),'No solution before answering '+id);
+      if(p.inputType==='coordinate-select'){
+        doc.getElementById('answer-column').value=correct?p.answers[0].match(/[A-Z]/)[0]:'A';doc.getElementById('answer-row').value=correct?p.answers[0].match(/\d/)[0]:'1';
+      }else if(p.inputType==='item-orientation'){
+        const select=doc.getElementById('answer-item');select.value='electronic';select.dispatchEvent(new win.Event('change',{bubbles:true}));doc.querySelector(`input[name="rotation"][value="${correct?180:0}"]`).checked=true;
+      }else if(p.inputType==='sequence-buttons'){
+        for(const letter of correct?'LHFHK':'A')doc.querySelector(`[data-action="sequence-add"][data-letter="${letter}"]`).click();
+      }else if(p.choices){
+        [...doc.querySelectorAll('input[name="answer"]')].find(input=>P.check(id,input.value)===correct).checked=true;
+      }else doc.getElementById('answer').value=correct?p.answers[0]:p.inputType==='inventory'?'score':'wrong';
+      doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();
+      assert(doc.getElementById('modal').open&&E.current(win.GameTest.getState()).id===id,id);assert(doc.getElementById('viewer-image').getAttribute('src')===solutionPath,id);
+      assert(win.GameTest.getState().answers[id].correct===correct,id);assert(!doc.querySelector('.interaction [data-action="advance"]'));const errors=E.stats(win.GameTest.getState()).errors;
+      await readSolutionUI(doc);const after=win.GameTest.getState();assert(!doc.getElementById('modal').open&&after.answers[id].solutionRead);assert(E.stats(after).errors===errors);
+      assert((after.phase==='intro'?after.introIndex:after.deckPositions[c.deck])===index+1,id+' must advance exactly one card');
+    }
+  });
+  await testAsync('橫拍解答依 EXIF 正向顯示，旋轉重設正確，桌面手機均完整顯示',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;
+    const motion=doc.createElement('style');motion.textContent='#viewer-image{transition:none!important}';doc.head.append(motion);
+    try{
+    for(const width of [1280,390,320])for(const id of ['p14','p15','p17','p19','p20','p48','p49','p50']){
+      frame.style.width=width+'px';const s=atPuzzle(id);s.inventory=Object.keys(D.items);E.submit(s,P.puzzles[id].answers[0]);win.GameTest.setState(s);doc.querySelector('[data-action="solution"]').click();
+      const img=doc.getElementById('viewer-image');if(!img.complete)await new Promise((resolve,reject)=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',reject,{once:true});});
+      assert(img.naturalWidth>0&&img.naturalHeight>img.naturalWidth,'EXIF must display portrait '+id);assert(Number(img.dataset.rotation)===0);doc.querySelector('[data-action="rotate"]').click();doc.querySelector('[data-action="view-reset"]').click();assert(Number(img.dataset.rotation)===0);
+      const rect=img.getBoundingClientRect(),viewport=doc.getElementById('viewer').getBoundingClientRect(),accept=doc.querySelector('[data-action="solution-read"]').getBoundingClientRect();
+      assert(rect.left>=viewport.left-1&&rect.right<=viewport.right+1,'Image width '+id+' at '+width+': '+rect.left+','+rect.right+' / '+viewport.left+','+viewport.right);assert(rect.top>=viewport.top-1&&rect.bottom<=viewport.bottom+1,'Image height '+id+' at '+width);
+      assert(accept.top>=0&&accept.bottom<=win.innerHeight,'Read button visible '+id+' at '+width);assert(doc.getElementById('modal-content').scrollWidth<=doc.getElementById('modal-content').clientWidth,'No modal overflow');
+      doc.getElementById('modal-close').click();assert(E.needsSolution(win.GameTest.getState()));
+    }
+    }finally{motion.remove();frame.style.width='1280px';}
+  });
   test('UI 物品限制擋住表單，26 在主畫面、歷史及比對均不提前公開',()=>{
     const win=frame.contentWindow,doc=frame.contentDocument;
     for(const [id,item] of [['p17','card777'],['p20','circuit'],['p23','keys'],['p24','cipher'],['p34','note'],['p48','disc']]){const s=atPuzzle(id,false);win.GameTest.setState(s);assert(doc.querySelector('.game-card'));assert(!doc.querySelector('#answer-form'));assert(doc.querySelector('.interaction p').textContent==='請先取得相應道具，再回來解開這道謎題。');assert(!doc.querySelector('.interaction').textContent.includes(D.items[item].name));s.inventory.push(item);win.GameTest.setState(s);assert(doc.querySelector('#answer-form'));}
     const flashlight=atPuzzle('blue-003');flashlight.inventory.push('flashlight');win.GameTest.setState(flashlight);assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);
-    const s=atPuzzle('p26',false);win.GameTest.setState(s);const source=encodeURIComponent('005-關閉顯示器-題目3_改.png');assert(!doc.querySelector('.game-card')&&!doc.querySelector('#answer-form')&&!doc.body.innerHTML.includes(source));assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);
+    const s=atPuzzle('p26',false);win.GameTest.setState(s);const source=encodeURIComponent('005-關閉顯示器-題目3.jpg');assert(!doc.querySelector('.game-card')&&!doc.querySelector('#answer-form')&&!doc.body.innerHTML.includes(source));assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);
     doc.querySelector('[data-action="history"]').click();assert(!doc.querySelector('#modal [data-card="p26"]'));doc.getElementById('modal-close').click();
     const compare=doc.createElement('button');compare.dataset.action='compare';doc.body.append(compare);compare.click();assert(!doc.querySelector('#compare-a option[value="p26"]'));assert(!doc.querySelector('#compare-b option[value="p26"]'));assert(!doc.getElementById('modal-content').innerHTML.includes(source));doc.getElementById('modal-close').click();compare.remove();
     s.inventory.push('flashlight');win.GameTest.setState(s);assert(doc.querySelector('.game-card').src.includes(source));assert(!doc.querySelector('#answer-form'));assert(doc.querySelector('.interaction p').textContent===E.ITEM_LOCK_MESSAGE);assert(!doc.body.innerHTML.includes(encodeURIComponent('004-手電筒-物品13.jpg')));
@@ -202,7 +321,31 @@
       for(const img of doc.querySelectorAll('.orientation-preview img')){const rect=img.getBoundingClientRect(),box=img.parentElement.getBoundingClientRect();assert(img.naturalWidth>0);assert(rect.left>=box.left-1&&rect.right<=box.right+1&&rect.top>=box.top-1&&rect.bottom<=box.bottom+1,'Rotated image must fit preview');}
     }frame.style.width='1280px';
   });
-  test('UI 新答案自動核對，不再要求人工選擇正誤',()=>{const win=frame.contentWindow,doc=frame.contentDocument;win.GameTest.setState(atPuzzle('p17'));doc.getElementById('answer').value='237';doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p17.correct&&win.GameTest.getState().answers.p17.mode==='automatic');assert(!doc.querySelector('[data-action="adjudicate"]'));doc.querySelector('[data-action="advance"]').click();assert(E.current(win.GameTest.getState()).id==='yellow-009');});
+  await testAsync('UI 自動核對並先讀解答，後續故事仍須確認閱讀',async()=>{const win=frame.contentWindow,doc=frame.contentDocument;win.GameTest.setState(atPuzzle('p17'));doc.getElementById('answer').value='237';doc.getElementById('answer-form').requestSubmit();doc.querySelector('[data-action="confirm-answer"]').click();assert(win.GameTest.getState().answers.p17.correct&&win.GameTest.getState().answers.p17.mode==='automatic');assert(!doc.querySelector('[data-action="adjudicate"]'));assert(E.current(win.GameTest.getState()).id==='p17');await readSolutionUI(doc);assert(E.current(win.GameTest.getState()).id==='yellow-009');assert(doc.querySelector('[data-action="advance"]').textContent.includes('我已閱讀'));doc.querySelector('[data-action="advance"]').click();assert(E.current(win.GameTest.getState()).id==='yellow-010');});
+  test('已讀解答的空狀態與未讀限制，不公開未確認或未到達的解答',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;win.GameTest.setState(E.fresh());doc.querySelector('[data-action="solution-history"]').click();assert(doc.getElementById('modal-title').textContent==='已讀解答');assert(doc.getElementById('modal-content').textContent.includes('還沒有已讀解答'));assert(!doc.querySelector('#modal img'));doc.getElementById('modal-close').click();
+    const s=atPuzzle('p17');E.submit(s,'237');win.GameTest.setState(s);const before=JSON.stringify(win.GameTest.getState());doc.querySelector('[data-action="solution-history"]').click();
+    assert(doc.querySelector('#modal [data-card="p6"]'));assert(!doc.querySelector('#modal [data-card="p17"]'));assert(!doc.querySelector('#modal [data-card="p14"]'));assert(!doc.getElementById('modal-content').innerHTML.includes(D.cards.p17.backImage.split('/').map(encodeURIComponent).join('/')));doc.getElementById('modal-close').click();
+    const trigger=doc.createElement('button');trigger.dataset.action='read-solution-view';trigger.dataset.card='p17';doc.body.append(trigger);trigger.click();trigger.remove();assert(!doc.getElementById('modal').open);assert(JSON.stringify(win.GameTest.getState())===before);
+    assert(!E.canViewSolution(s,'p17'));E.readSolution(s);assert(E.canViewSolution(s,'p17'));const unvisited=E.clone(s);unvisited.visited=unvisited.visited.filter(id=>id!=='p17');assert(!E.canViewSolution(unvisited,'p17'));
+  });
+  test('已讀解答包含答對與答錯題目，可重看旋轉且不改變進度與評分',()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument,s=atPuzzle('p17'),wrong=atPuzzle('p14');E.submit(wrong,'4');E.readSolution(wrong);s.answers.p14=wrong.answers.p14;s.visited.push('p14');E.submit(s,'237');E.readSolution(s);E.advance(s);win.GameTest.setState(s);
+    const before=JSON.stringify(win.GameTest.getState());
+    for(const id of ['p14','p17']){
+      doc.querySelector('[data-action="solution-history"]').click();assert([...doc.querySelectorAll('#modal [data-action="read-solution-view"]')].map(button=>button.dataset.card).join(',')==='p6,p14,p17');doc.querySelector(`#modal [data-card="${id}"]`).click();
+      assert(doc.getElementById('viewer-image').getAttribute('src')===D.cards[id].backImage.split('/').map(encodeURIComponent).join('/'));assert(!doc.querySelector('[data-action="solution-read"]'));doc.querySelector('[data-action="rotate"]').click();doc.querySelector('[data-action="view-reset"]').click();assert(doc.getElementById('viewer-image').dataset.rotation==='0');doc.getElementById('modal-close').click();assert(JSON.stringify(win.GameTest.getState())===before);
+    }
+    win.GameTest.save();win.GameTest.reload();doc.querySelector('[data-action="solution-history"]').click();assert(doc.querySelectorAll('#modal [data-action="read-solution-view"]').length===3);doc.getElementById('modal-close').click();assert(JSON.stringify(win.GameTest.getState())===before);
+  });
+  await testAsync('已讀解答入口與 26 張縮圖在桌面、390px、320px 不溢出',async()=>{
+    const win=frame.contentWindow,doc=frame.contentDocument;win.GameTest.setState(E.clone(window.completeFixture));
+    for(const width of [1280,390,320]){
+      frame.style.width=width+'px';await new Promise(resolve=>setTimeout(resolve,100));assert(doc.documentElement.scrollWidth<=win.innerWidth);const entry=doc.querySelector('.side-tools [data-action="solution-history"]'),rect=entry.getBoundingClientRect();assert(rect.left>=0&&rect.right<=win.innerWidth);assert(entry.previousElementSibling.dataset.action==='history');entry.click();
+      const content=doc.getElementById('modal-content');assert(doc.querySelectorAll('#modal [data-action="read-solution-view"]').length===26);assert(content.scrollWidth<=content.clientWidth,'Solution list overflow at '+width);doc.getElementById('modal-close').click();
+    }
+    frame.style.width='1280px';win.GameTest.setState(playing());
+  });
   test('筆記與答案以純文字呈現，存檔可恢復',()=>{const win=frame.contentWindow,doc=frame.contentDocument;const notes=doc.getElementById('notes');notes.value='<img src=x onerror=alert(1)>';notes.dispatchEvent(new Event('input',{bubbles:true}));win.GameTest.reload();assert(doc.getElementById('notes').value===notes.value);assert(!doc.querySelector('img[src="x"]'));});
   test('舊存檔可直接繼續，開始新局須重讀規則，取消重開仍保留進度',()=>{
     const win=frame.contentWindow,doc=frame.contentDocument,before=JSON.stringify(win.GameTest.getState());doc.querySelector('[data-action="home"]').click();assert(!doc.querySelector('[data-action="new"]').disabled);
@@ -268,8 +411,8 @@
   await testAsync('提示只顯示該題圖片列且可重複查看',async()=>{const doc=frame.contentDocument;doc.querySelector('[data-action="hint"]').click();await new Promise(resolve=>setTimeout(resolve,100));assert(doc.getElementById('hint-canvas').width===1040);assert(!doc.querySelector('#modal img'));doc.querySelector('[data-action="hint-rotate"]').click();assert(doc.getElementById('hint-canvas').style.transform==='rotate(180deg)');assert(frame.contentWindow.GameTest.getState().hints.length===1);doc.getElementById('modal-close').click();});
   await testAsync('卡牌放大旋轉後完整置於可視範圍',async()=>{const doc=frame.contentDocument;doc.querySelector('.game-card').click();await new Promise(resolve=>setTimeout(resolve,100));doc.querySelector('[data-action="rotate"][data-angle="90"]').click();const stage=doc.getElementById('viewer-stage').getBoundingClientRect(),viewport=doc.getElementById('viewer').getBoundingClientRect();assert(stage.width<=viewport.width+1);assert(stage.height<=frame.contentWindow.innerHeight*.64);assert(doc.getElementById('viewer-image').style.transform.includes('90deg'));doc.getElementById('modal-close').click();});
   await testAsync('手機 390px 與 320px 畫面不水平溢出',async()=>{const doc=frame.contentDocument;for(const width of [390,320]){frame.style.width=width+'px';await new Promise(resolve=>setTimeout(resolve,100));assert(doc.documentElement.scrollWidth<=frame.contentWindow.innerWidth,'Overflow at '+width+': '+doc.documentElement.scrollWidth);doc.querySelector('[data-action="home"]').click();assert(doc.documentElement.scrollWidth<=frame.contentWindow.innerWidth,'Home overflow at '+width);doc.querySelector('[data-action="continue"]').click();}frame.style.width='1280px';});
-  await testAsync('77 張來源圖像均可在瀏覽器成功載入',async()=>{
-    const sources=new Set(Object.values(D.cards).flatMap(c=>[c.frontImage,c.backImage].filter(Boolean)));sources.add(D.hintsImage);assert(sources.size===77,'Expected 77 assets, got '+sources.size);
+  await testAsync('102 張來源圖像含新增 25 張解答均可載入',async()=>{
+    const sources=new Set(Object.values(D.cards).flatMap(c=>[c.frontImage,c.backImage].filter(Boolean)));sources.add(D.hintsImage);assert(sources.size===102,'Expected 102 assets, got '+sources.size);
     await Promise.all([...sources].map(src=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>img.naturalWidth>0?resolve():reject(new Error(src));img.onerror=()=>reject(new Error(src));img.src='../'+src.split('/').map(encodeURIComponent).join('/');})));
   });
   output.textContent=results.join('\n')+'\n\n'+(failed?'FAIL':'PASS')+`: ${results.length-failed}/${results.length}`;
